@@ -1,0 +1,9 @@
+---
+title: "Izabelle Diaz — STA 9750"
+---
+
+Hi! I'm Izabelle Diaz, a Master's student at Baruch College.
+
+```{r}
+#| include: false
+1+1
