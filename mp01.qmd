@@ -9,15 +9,10 @@ library(tidyverse)
 library(stringr)
 library(gt)
 library(skimr)
-
-# load provided dataset (no downloads needed)
-IPEDS <- read_csv("IPEDS_sample.csv")
+library(glue)
 ```
 
 ```{r}
-head(IPEDS)
-```
-
 #' Acquire IPEDS Data for MP#01
 #' 
 #' This function will acquire and standardize all data for MP#01
@@ -142,6 +137,16 @@ acquire_ipeds_data <- function(start_year=2010, end_year=2024){
                        year == year))
 }
 ```{r}
+}
+```
+
+```{r}
+IPEDS <- acquire_ipeds_data()
+```
+
+```{r}
+IPEDS <- IPEDS |>
+  mutate(is_cuny = str_detect(institution_name, "CUNY"))
 ```
 
 ```{r}
