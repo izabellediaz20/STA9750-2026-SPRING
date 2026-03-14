@@ -2,6 +2,7 @@
 title: "Mini Project 01"
 author: "Izabelle Diaz"
 format: html
+css: styles.css
 ---
 
 ```{r}
