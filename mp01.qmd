@@ -19,11 +19,19 @@ Using data analysis tools in R, this report examines enrollment patterns and dem
 
 ## Setup
 
-```{r}
-# Install tidyverse if GitHub runner doesn't have it
-if (!require("tidyverse")) install.packages("tidyverse")
+## Setup
 
-# Load required libraries
+```{r}
+# Install packages if missing (needed for GitHub build)
+packages <- c("tidyverse","googledrive","googlesheets4","httr","ragg","rvest","gt","readr","stringr","ggplot2","dplyr")
+
+for (p in packages) {
+  if (!require(p, character.only = TRUE)) {
+    install.packages(p, repos = "https://cloud.r-project.org")
+  }
+}
+
+# Load libraries
 library(tidyverse)
 library(dplyr)
 library(readr)
