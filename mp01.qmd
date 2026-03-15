@@ -20,8 +20,12 @@ Using data analysis tools in R, this report examines enrollment patterns and dem
 ## Setup
 
 ```{r}
+# Install tidyverse if GitHub runner doesn't have it
+if (!require("tidyverse")) install.packages("tidyverse")
+
 # Load required libraries
 library(tidyverse)
+library(dplyr)
 library(readr)
 library(stringr)
 library(ggplot2)
