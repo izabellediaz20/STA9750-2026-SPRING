@@ -419,16 +419,50 @@ acquire_ipeds_data &lt;- function(start_year=2010, end_year=2024){
         ef_file &lt;- file.path(data_dir, glue(&quot;ef{yy}a.csv.zip&quot;))
         
         if(!file.exists(ef_file)){
-            message(glue(&quot;Downloading Enrollment Data for {yy}&quot;))
+            message(glue(&quot;Downloading Enrollment Data for {yy} from {ef_url}&quot;))
             download.file(ef_url, destfile = ef_file, quiet=TRUE, mode=&quot;wb&quot;)    
         }
         
         read_csv(ef_file, show_col_types=FALSE) |&gt;
             mutate(
-                institution_id = UNITID,
-                year = yy
+                year = yy,
+                enrollment_m_aian = EFAIANM,
+                enrollment_f_aian = EFAIANW,
+                enrollment_m_asia = EFASIAM,
+                enrollment_f_asia = EFASIAW,
+                enrollment_m_bkaa = EFBKAAM,
+                enrollment_f_bkaa = EFBKAAW,
+                enrollment_m_hisp = EFHISPM,
+                enrollment_f_hisp = EFHISPW,
+                enrollment_m_nhpi = EFNHPIM,
+                enrollment_f_nhpi = EFNHPIW,
+                enrollment_m_whit = EFWHITM,
+                enrollment_f_whit = EFWHITW,
+                enrollment_m_2mor = EF2MORM,
+                enrollment_f_2mor = EF2MORW,
+                enrollment_m_unkn = EFUNKNM,
+                enrollment_f_unkn = EFUNKNW,
+                enrollment_m_nral = EFNRALM,
+                enrollment_f_nral = EFNRALW
             ) |&gt;
-            select(institution_id, year, everything())
+            filter(
+                (EFALEVEL %in% c(2, 12)) | (LINE %in% c(1, 15))
+            ) |&gt;
+            mutate(
+                level = case_when(
+                    EFALEVEL == 2 ~ &quot;all undergrad&quot;,
+                    EFALEVEL == 12 ~ &quot;all graduate&quot;,
+                    LINE %in% c(1, 15) ~ &quot;first year undergrad&quot;
+                )
+            ) |&gt;
+            select(
+                institution_id = UNITID,
+                year,
+                level,
+                starts_with(&quot;enrollment_&quot;)
+            ) |&gt;
+            group_by(institution_id, year, level) |&gt;
+            summarize(across(starts_with(&quot;enrollment_&quot;), sum), .groups = &quot;drop&quot;)
         
     }) |&gt; bind_rows()
     
@@ -442,11 +476,16 @@ acquire_ipeds_data &lt;- function(start_year=2010, end_year=2024){
         hd_file &lt;- file.path(data_dir, glue(&quot;hd{yy}.csv.zip&quot;))
         
         if(!file.exists(hd_file)){
-            message(glue(&quot;Downloading Institutional Data for {yy}&quot;))
+            message(glue(&quot;Downloading Institutional Descriptions for {yy} from {hd_url}&quot;))
             download.file(hd_url, destfile = hd_file, quiet=TRUE, mode=&quot;wb&quot;)    
         }
         
-        read_csv(hd_file, show_col_types=FALSE) |&gt;
+        suppressWarnings(
+            read_csv(
+                hd_file,
+                show_col_types=FALSE,
+                locale=locale(encoding=if_else(yy == 2024, &quot;utf-8&quot;, &quot;windows-1252&quot;))
+            ) |&gt;
             mutate(year = yy) |&gt;
             select(
                 institution_id = UNITID,
@@ -454,10 +493,15 @@ acquire_ipeds_data &lt;- function(start_year=2010, end_year=2024){
                 state = STABBR,
                 year
             )
+        )
         
     }) |&gt; bind_rows()
     
-    inner_join(EFA_ALL, DESC_ALL, by = c(&quot;institution_id&quot;,&quot;year&quot;))
+    inner_join(
+        EFA_ALL,
+        DESC_ALL,
+        by = c(&quot;institution_id&quot;, &quot;year&quot;)
+    )
 }
 
 IPEDS &lt;- acquire_ipeds_data()</code></pre>
@@ -475,16 +519,7 @@ IPEDS &lt;- acquire_ipeds_data()</code></pre>
 ## Multiple files in zip: reading &#39;ef2021a.csv&#39;
 ## Multiple files in zip: reading &#39;ef2022a.csv&#39;
 ## New names:
-## Multiple files in zip: reading &#39;ef2023a.csv&#39;
-## New names:</code></pre>
-<pre><code>## Warning: One or more parsing issues, call `problems()` on your
-## data frame for details, e.g.:
-##   dat &lt;- vroom(...)
-##   problems(dat)
-## One or more parsing issues, call `problems()` on your
-## data frame for details, e.g.:
-##   dat &lt;- vroom(...)
-##   problems(dat)</code></pre>
+## Multiple files in zip: reading &#39;ef2023a.csv&#39;</code></pre>
 </div>
 <div id="task-2-identify-cuny-schools" class="section level2">
 <h2>Task 2: Identify CUNY Schools</h2>
@@ -529,412 +564,111 @@ imported correctly.</p>
 <div id="inspecting-the-structure-of-the-dataset" class="section level3">
 <h3>Inspecting the structure of the dataset</h3>
 <pre class="r"><code>glimpse(IPEDS)</code></pre>
-<pre><code>## Rows: 1,916,174
-## Columns: 83
-## $ institution_id   &lt;dbl&gt; 100654, 100654, 100654, 1006…
-## $ year             &lt;int&gt; 2010, 2010, 2010, 2010, 2010…
-## $ UNITID           &lt;dbl&gt; 100654, 100654, 100654, 1006…
-## $ EFALEVEL         &lt;dbl&gt; 1, 2, 3, 4, 5, 11, 12, 19, 2…
-## $ LINE             &lt;dbl&gt; 29, 99, 99, 99, 99, 99, 99, …
-## $ SECTION          &lt;dbl&gt; 3, 3, 3, 3, 3, 3, 3, 3, 3, 1…
-## $ LSTUDY           &lt;dbl&gt; 4, 1, 1, 1, 1, 1, 3, 1, 1, 4…
-## $ XEFTOTLT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFTOTLT          &lt;dbl&gt; 5814, 4940, 4930, 1123, 3807…
-## $ XEFTOTLM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFTOTLM          &lt;dbl&gt; 2644, 2355, 2352, 548, 1804,…
-## $ XEFTOTLW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFTOTLW          &lt;dbl&gt; 3170, 2585, 2578, 575, 2003,…
-## $ XEFAIANT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFAIANT          &lt;dbl&gt; 5, 3, 3, 0, 3, 0, 2, 0, 3, 2…
-## $ XEFAIANM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFAIANM          &lt;dbl&gt; 4, 2, 2, 0, 2, 0, 2, 0, 2, 1…
-## $ XEFAIANW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFAIANW          &lt;dbl&gt; 1, 1, 1, 0, 1, 0, 0, 0, 1, 1…
-## $ XEFASIAT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFASIAT          &lt;dbl&gt; 21, 9, 9, 1, 8, 0, 12, 1, 7,…
-## $ XEFASIAM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFASIAM          &lt;dbl&gt; 6, 2, 2, 0, 2, 0, 4, 1, 1, 3…
-## $ XEFASIAW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFASIAW          &lt;dbl&gt; 15, 7, 7, 1, 6, 0, 8, 0, 6, …
-## $ XEFBKAAT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFBKAAT          &lt;dbl&gt; 5377, 4748, 4741, 1082, 3659…
-## $ XEFBKAAM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFBKAAM          &lt;dbl&gt; 2449, 2250, 2248, 527, 1721,…
-## $ XEFBKAAW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFBKAAW          &lt;dbl&gt; 2928, 2498, 2493, 555, 1938,…
-## $ XEFHISPT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFHISPT          &lt;dbl&gt; 18, 16, 16, 4, 12, 0, 2, 3, …
-## $ XEFHISPM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFHISPM          &lt;dbl&gt; 9, 9, 9, 3, 6, 0, 0, 1, 5, 8…
-## $ XEFHISPW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFHISPW          &lt;dbl&gt; 9, 7, 7, 1, 6, 0, 2, 2, 4, 5…
-## $ XEFNHPIT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFNHPIT          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-## $ XEFNHPIM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFNHPIM          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-## $ XEFNHPIW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFNHPIW          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-## $ XEFWHITT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFWHITT          &lt;dbl&gt; 273, 101, 98, 16, 82, 3, 172…
-## $ XEFWHITM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFWHITM          &lt;dbl&gt; 106, 59, 58, 7, 51, 1, 47, 1…
-## $ XEFWHITW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFWHITW          &lt;dbl&gt; 167, 42, 40, 9, 31, 2, 125, …
-## $ XEF2MORT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EF2MORT          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-## $ XEF2MORM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EF2MORM          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-## $ XEF2MORW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EF2MORW          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
-## $ XEFUNKNT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFUNKNT          &lt;dbl&gt; 24, 20, 20, 16, 4, 0, 4, 2, …
-## $ XEFUNKNM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFUNKNM          &lt;dbl&gt; 10, 10, 10, 9, 1, 0, 0, 1, 0…
-## $ XEFUNKNW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFUNKNW          &lt;dbl&gt; 14, 10, 10, 7, 3, 0, 4, 1, 2…
-## $ XEFNRALT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFNRALT          &lt;dbl&gt; 96, 43, 43, 4, 39, 0, 53, 5,…
-## $ XEFNRALM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFNRALM          &lt;dbl&gt; 60, 23, 23, 2, 21, 0, 37, 1,…
-## $ XEFNRALW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
-## $ EFNRALW          &lt;dbl&gt; 36, 20, 20, 2, 18, 0, 16, 4,…
-## $ XEFGNDRU...68    &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ EFGNDRUN         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ XEFGNDRA         &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ EFGNDRAN         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ XEFGNDRU...72    &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ EFGNDRUA         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ XEFGNDRK         &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ EFGNDRKN         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ XEFGNDRUN        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ XEFGNDRAN        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ XEFGNDRUA        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ XEFGNDRKN        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
-## $ institution_name &lt;chr&gt; &quot;Alabama A &amp; M University&quot;, …
-## $ state            &lt;chr&gt; &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;…
-## $ is_cuny          &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, …
-## $ is_calpublic     &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, …</code></pre>
+<pre><code>## Rows: 219,316
+## Columns: 25
+## $ institution_id    &lt;dbl&gt; 100654, 100654, 100654, 100…
+## $ year              &lt;int&gt; 2010, 2010, 2010, 2010, 201…
+## $ level             &lt;chr&gt; &quot;all graduate&quot;, &quot;all underg…
+## $ enrollment_m_aian &lt;dbl&gt; 2, 2, 0, 5, 13, 0, 0, 0, 0,…
+## $ enrollment_f_aian &lt;dbl&gt; 0, 1, 0, 16, 22, 3, 0, 0, 0…
+## $ enrollment_m_asia &lt;dbl&gt; 4, 2, 0, 114, 210, 54, 0, 0…
+## $ enrollment_f_asia &lt;dbl&gt; 8, 7, 1, 191, 245, 55, 1, 3…
+## $ enrollment_m_bkaa &lt;dbl&gt; 199, 2250, 527, 182, 889, 1…
+## $ enrollment_f_bkaa &lt;dbl&gt; 430, 2498, 555, 669, 2016, …
+## $ enrollment_m_hisp &lt;dbl&gt; 0, 9, 3, 37, 79, 14, 4, 9, …
+## $ enrollment_f_hisp &lt;dbl&gt; 2, 7, 1, 82, 141, 14, 2, 3,…
+## $ enrollment_m_nhpi &lt;dbl&gt; 0, 0, 0, 0, 4, 1, 0, 0, 0, …
+## $ enrollment_f_nhpi &lt;dbl&gt; 0, 0, 0, 0, 4, 1, 0, 0, 0, …
+## $ enrollment_m_whit &lt;dbl&gt; 47, 59, 7, 1713, 3081, 455,…
+## $ enrollment_f_whit &lt;dbl&gt; 125, 42, 9, 2886, 3601, 490…
+## $ enrollment_m_2mor &lt;dbl&gt; 0, 0, 0, 16, 54, 18, 0, 0, …
+## $ enrollment_f_2mor &lt;dbl&gt; 0, 0, 0, 30, 75, 34, 0, 0, …
+## $ enrollment_m_unkn &lt;dbl&gt; 0, 10, 9, 64, 179, 5, 23, 4…
+## $ enrollment_f_unkn &lt;dbl&gt; 4, 10, 7, 92, 206, 7, 39, 6…
+## $ enrollment_m_nral &lt;dbl&gt; 37, 23, 2, 242, 99, 5, 0, 0…
+## $ enrollment_f_nral &lt;dbl&gt; 16, 20, 2, 176, 110, 8, 0, …
+## $ institution_name  &lt;chr&gt; &quot;Alabama A &amp; M University&quot;,…
+## $ state             &lt;chr&gt; &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL…
+## $ is_cuny           &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE,…
+## $ is_calpublic      &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE,…</code></pre>
 </div>
 <div id="summary-statistics" class="section level3">
 <h3>Summary statistics</h3>
 <pre class="r"><code>summary(IPEDS)</code></pre>
-<pre><code>##  institution_id        year          UNITID      
-##  Min.   :100654   Min.   :2010   Min.   :100654  
-##  1st Qu.:164216   1st Qu.:2013   1st Qu.:164216  
-##  Median :212197   Median :2016   Median :212197  
-##  Mean   :264673   Mean   :2017   Mean   :264673  
-##  3rd Qu.:420556   3rd Qu.:2020   3rd Qu.:420556  
-##  Max.   :500555   Max.   :2024   Max.   :500555  
-##                                                  
-##     EFALEVEL          LINE          SECTION     
-##  Min.   : 1.00   Min.   : 1.00   Min.   :1.000  
-##  1st Qu.: 5.00   1st Qu.:11.00   1st Qu.:1.000  
-##  Median :23.00   Median :25.00   Median :2.000  
-##  Mean   :25.56   Mean   :48.06   Mean   :2.008  
-##  3rd Qu.:41.00   3rd Qu.:99.00   3rd Qu.:3.000  
-##  Max.   :60.00   Max.   :99.00   Max.   :3.000  
-##                                                 
-##      LSTUDY        XEFTOTLT            EFTOTLT      
-##  Min.   :1.000   Length:1916174     Min.   :     1  
-##  1st Qu.:1.000   Class :character   1st Qu.:    47  
-##  Median :1.000   Mode  :character   Median :   199  
-##  Mean   :1.522                      Mean   :  1353  
-##  3rd Qu.:1.000                      3rd Qu.:   975  
-##  Max.   :4.000                      Max.   :307965  
-##                                                     
-##    XEFTOTLM            EFTOTLM       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    8.0  
-##  Mode  :character   Median :   65.0  
-##                     Mean   :  579.8  
-##                     3rd Qu.:  401.0  
-##                     Max.   :90693.0  
-##                                      
-##    XEFTOTLW            EFTOTLW        
-##  Length:1916174     Min.   :     0.0  
-##  Class :character   1st Qu.:    28.0  
-##  Mode  :character   Median :   122.0  
-##                     Mean   :   773.5  
-##                     3rd Qu.:   571.0  
-##                     Max.   :218234.0  
-##                                       
-##    XEFAIANT            EFAIANT        
-##  Length:1916174     Min.   :   0.000  
-##  Class :character   1st Qu.:   0.000  
-##  Mode  :character   Median :   1.000  
-##                     Mean   :   9.769  
-##                     3rd Qu.:   5.000  
-##                     Max.   :2973.000  
-##                                       
-##    XEFAIANM            EFAIANM        
-##  Length:1916174     Min.   :   0.000  
-##  Class :character   1st Qu.:   0.000  
-##  Mode  :character   Median :   0.000  
-##                     Mean   :   3.794  
-##                     3rd Qu.:   2.000  
-##                     Max.   :1498.000  
-##                                       
-##    XEFAIANW            EFAIANW        
-##  Length:1916174     Min.   :   0.000  
-##  Class :character   1st Qu.:   0.000  
-##  Mode  :character   Median :   0.000  
-##                     Mean   :   5.975  
-##                     3rd Qu.:   3.000  
-##                     Max.   :2016.000  
-##                                       
-##    XEFASIAT            EFASIAT        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    3.00  
-##                     Mean   :   82.33  
-##                     3rd Qu.:   21.00  
-##                     Max.   :15175.00  
-##                                       
-##    XEFASIAM            EFASIAM       
-##  Length:1916174     Min.   :   0.00  
-##  Class :character   1st Qu.:   0.00  
-##  Mode  :character   Median :   1.00  
-##                     Mean   :  38.43  
-##                     3rd Qu.:   9.00  
-##                     Max.   :9495.00  
-##                                      
-##    XEFASIAW            EFASIAW      
-##  Length:1916174     Min.   :   0.0  
-##  Class :character   1st Qu.:   0.0  
-##  Mode  :character   Median :   2.0  
-##                     Mean   :  43.9  
-##                     3rd Qu.:  12.0  
-##                     Max.   :7749.0  
-##                                     
-##    XEFBKAAT            EFBKAAT       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    3.0  
-##  Mode  :character   Median :   21.0  
-##                     Mean   :  174.1  
-##                     3rd Qu.:  101.0  
-##                     Max.   :58927.0  
-##                                      
-##    XEFBKAAM            EFBKAAM        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    6.00  
-##                     Mean   :   63.58  
-##                     3rd Qu.:   38.00  
-##                     Max.   :13019.00  
-##                                       
-##    XEFBKAAW            EFBKAAW       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    1.0  
-##  Mode  :character   Median :   11.0  
-##                     Mean   :  110.5  
-##                     3rd Qu.:   60.0  
-##                     Max.   :45908.0  
-##                                      
-##    XEFHISPT            EFHISPT       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    2.0  
-##  Mode  :character   Median :   17.0  
-##                     Mean   :  248.9  
-##                     3rd Qu.:  101.0  
-##                     Max.   :46806.0  
-##                                      
-##    XEFHISPM            EFHISPM       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    0.0  
-##  Mode  :character   Median :    5.0  
-##                     Mean   :  102.3  
-##                     3rd Qu.:   38.0  
-##                     Max.   :19464.0  
-##                                      
-##    XEFHISPW            EFHISPW       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    1.0  
-##  Mode  :character   Median :   10.0  
-##                     Mean   :  146.6  
-##                     3rd Qu.:   60.0  
-##                     Max.   :27342.0  
-##                                      
-##    XEFNHPIT            EFNHPIT        
-##  Length:1916174     Min.   :   0.000  
-##  Class :character   1st Qu.:   0.000  
-##  Mode  :character   Median :   0.000  
-##                     Mean   :   4.178  
-##                     3rd Qu.:   2.000  
-##                     Max.   :2910.000  
-##                                       
-##    XEFNHPIM            EFNHPIM        
-##  Length:1916174     Min.   :   0.000  
-##  Class :character   1st Qu.:   0.000  
-##  Mode  :character   Median :   0.000  
-##                     Mean   :   1.821  
-##                     3rd Qu.:   1.000  
-##                     Max.   :1354.000  
-##                                       
-##    XEFNHPIW            EFNHPIW        
-##  Length:1916174     Min.   :   0.000  
-##  Class :character   1st Qu.:   0.000  
-##  Mode  :character   Median :   0.000  
-##                     Mean   :   2.357  
-##                     3rd Qu.:   1.000  
-##                     Max.   :1556.000  
-##                                       
-##    XEFWHITT            EFWHITT        
-##  Length:1916174     Min.   :     0.0  
-##  Class :character   1st Qu.:    14.0  
-##  Mode  :character   Median :    76.0  
-##                     Mean   :   674.3  
-##                     3rd Qu.:   465.0  
-##                     Max.   :126662.0  
-##                                       
-##    XEFWHITM            EFWHITM       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    2.0  
-##  Mode  :character   Median :   23.0  
-##                     Mean   :  295.5  
-##                     3rd Qu.:  192.0  
-##                     Max.   :42802.0  
-##                                      
-##    XEFWHITW            EFWHITW       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    8.0  
-##  Mode  :character   Median :   46.0  
-##                     Mean   :  378.7  
-##                     3rd Qu.:  268.0  
-##                     Max.   :88076.0  
-##                                      
-##    XEF2MORT            EF2MORT        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    3.00  
-##                     Mean   :   43.53  
-##                     3rd Qu.:   23.00  
-##                     Max.   :19039.00  
-##                                       
-##    XEF2MORM            EF2MORM       
-##  Length:1916174     Min.   :   0.00  
-##  Class :character   1st Qu.:   0.00  
-##  Mode  :character   Median :   1.00  
-##                     Mean   :  18.18  
-##                     3rd Qu.:   9.00  
-##                     Max.   :5507.00  
-##                                      
-##    XEF2MORW            EF2MORW        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    2.00  
-##                     Mean   :   25.34  
-##                     3rd Qu.:   13.00  
-##                     Max.   :13532.00  
-##                                       
-##    XEFUNKNT            EFUNKNT        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    4.00  
-##                     Mean   :   66.87  
-##                     3rd Qu.:   31.00  
-##                     Max.   :89858.00  
-##                                       
-##    XEFUNKNM            EFUNKNM        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    1.00  
-##                     Mean   :   29.57  
-##                     3rd Qu.:   12.00  
-##                     Max.   :31387.00  
-##                                       
-##    XEFUNKNW            EFUNKNW       
-##  Length:1916174     Min.   :    0.0  
-##  Class :character   1st Qu.:    0.0  
-##  Mode  :character   Median :    2.0  
-##                     Mean   :   37.3  
-##                     3rd Qu.:   17.0  
-##                     Max.   :62271.0  
-##                                      
-##    XEFNRALT            EFNRALT        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    0.00  
-##                     Mean   :   49.39  
-##                     3rd Qu.:    9.00  
-##                     Max.   :19693.00  
-##                                       
-##    XEFNRALM            EFNRALM       
-##  Length:1916174     Min.   :   0.00  
-##  Class :character   1st Qu.:   0.00  
-##  Mode  :character   Median :   0.00  
-##                     Mean   :  26.64  
-##                     3rd Qu.:   4.00  
-##                     Max.   :9415.00  
-##                                      
-##    XEFNRALW            EFNRALW        
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    0.00  
-##                     Mean   :   22.75  
-##                     3rd Qu.:    4.00  
-##                     Max.   :10278.00  
-##                                       
-##  XEFGNDRU...68         EFGNDRUN       
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    0.00  
-##                     Mean   :   31.46  
-##                     3rd Qu.:    0.00  
-##                     Max.   :14868.00  
-##                     NA&#39;s   :1875373   
-##    XEFGNDRA            EFGNDRAN      
-##  Length:1916174     Min.   :   0.00  
-##  Class :character   1st Qu.:   0.00  
-##  Mode  :character   Median :   0.00  
-##                     Mean   :  18.99  
-##                     3rd Qu.:   0.00  
-##                     Max.   :1754.00  
-##                     NA&#39;s   :1903175  
-##  XEFGNDRU...72         EFGNDRUA       
-##  Length:1916174     Min.   :    0.00  
-##  Class :character   1st Qu.:    0.00  
-##  Mode  :character   Median :    0.00  
-##                     Mean   :   38.87  
-##                     3rd Qu.:    1.00  
-##                     Max.   :14868.00  
-##                     NA&#39;s   :1879307   
-##    XEFGNDRK            EFGNDRKN      
-##  Length:1916174     Min.   :     0   
-##  Class :character   1st Qu.:   115   
-##  Mode  :character   Median :   518   
-##                     Mean   :  2864   
-##                     3rd Qu.:  2461   
-##                     Max.   :197477   
-##                     NA&#39;s   :1879307  
-##   XEFGNDRUN          XEFGNDRAN        
-##  Length:1916174     Length:1916174    
-##  Class :character   Class :character  
-##  Mode  :character   Mode  :character  
-##                                       
-##                                       
-##                                       
-##                                       
-##   XEFGNDRUA          XEFGNDRKN        
-##  Length:1916174     Length:1916174    
-##  Class :character   Class :character  
-##  Mode  :character   Mode  :character  
-##                                       
-##                                       
-##                                       
-##                                       
+<pre><code>##  institution_id        year         level          
+##  Min.   :100654   Min.   :2010   Length:219316     
+##  1st Qu.:167039   1st Qu.:2013   Class :character  
+##  Median :216597   Median :2016   Mode  :character  
+##  Mean   :274222   Mean   :2017                     
+##  3rd Qu.:438586   3rd Qu.:2020                     
+##  Max.   :500555   Max.   :2024                     
+##  enrollment_m_aian  enrollment_f_aian 
+##  Min.   :   0.000   Min.   :   0.000  
+##  1st Qu.:   0.000   1st Qu.:   0.000  
+##  Median :   0.000   Median :   0.000  
+##  Mean   :   4.521   Mean   :   6.889  
+##  3rd Qu.:   2.000   3rd Qu.:   3.000  
+##  Max.   :1498.000   Max.   :1719.000  
+##  enrollment_m_asia enrollment_f_asia
+##  Min.   :   0.00   Min.   :   0.00  
+##  1st Qu.:   0.00   1st Qu.:   0.00  
+##  Median :   1.00   Median :   2.00  
+##  Mean   :  45.47   Mean   :  52.39  
+##  3rd Qu.:  11.00   3rd Qu.:  16.00  
+##  Max.   :6541.00   Max.   :6378.00  
+##  enrollment_m_bkaa  enrollment_f_bkaa
+##  Min.   :    0.00   Min.   :    0.0  
+##  1st Qu.:    1.00   1st Qu.:    2.0  
+##  Median :    9.00   Median :   15.0  
+##  Mean   :   75.73   Mean   :  128.6  
+##  3rd Qu.:   49.00   3rd Qu.:   71.0  
+##  Max.   :10401.00   Max.   :36035.0  
+##  enrollment_m_hisp enrollment_f_hisp
+##  Min.   :    0.0   Min.   :    0.0  
+##  1st Qu.:    1.0   1st Qu.:    2.0  
+##  Median :    7.0   Median :   14.0  
+##  Mean   :  120.3   Mean   :  170.7  
+##  3rd Qu.:   48.0   3rd Qu.:   74.0  
+##  Max.   :19464.0   Max.   :27342.0  
+##  enrollment_m_nhpi  enrollment_f_nhpi 
+##  Min.   :   0.000   Min.   :   0.000  
+##  1st Qu.:   0.000   1st Qu.:   0.000  
+##  Median :   0.000   Median :   0.000  
+##  Mean   :   2.112   Mean   :   2.721  
+##  3rd Qu.:   1.000   3rd Qu.:   1.000  
+##  Max.   :1354.000   Max.   :1556.000  
+##  enrollment_m_whit enrollment_f_whit enrollment_m_2mor
+##  Min.   :    0.0   Min.   :    0.0   Min.   :   0.00  
+##  1st Qu.:    2.0   1st Qu.:   10.0   1st Qu.:   0.00  
+##  Median :   33.0   Median :   59.0   Median :   1.00  
+##  Mean   :  351.7   Mean   :  450.9   Mean   :  21.76  
+##  3rd Qu.:  237.0   3rd Qu.:  314.0   3rd Qu.:  12.00  
+##  Max.   :34014.0   Max.   :74462.0   Max.   :5000.00  
+##  enrollment_f_2mor  enrollment_m_unkn 
+##  Min.   :    0.00   Min.   :    0.00  
+##  1st Qu.:    0.00   1st Qu.:    0.00  
+##  Median :    2.00   Median :    1.00  
+##  Mean   :   30.17   Mean   :   36.47  
+##  3rd Qu.:   17.00   3rd Qu.:   16.00  
+##  Max.   :12146.00   Max.   :25579.00  
+##  enrollment_f_unkn enrollment_m_nral enrollment_f_nral
+##  Min.   :    0     Min.   :   0.0    Min.   :   0.00  
+##  1st Qu.:    0     1st Qu.:   0.0    1st Qu.:   0.00  
+##  Median :    2     Median :   0.0    Median :   0.00  
+##  Mean   :   46     Mean   :  37.4    Mean   :  31.24  
+##  3rd Qu.:   22     3rd Qu.:   8.0    3rd Qu.:   7.00  
+##  Max.   :52081     Max.   :8181.0    Max.   :6339.00  
 ##  institution_name      state            is_cuny       
-##  Length:1916174     Length:1916174     Mode :logical  
-##  Class :character   Class :character   FALSE:1909063  
-##  Mode  :character   Mode  :character   TRUE :7111     
-##                                                       
+##  Length:219316      Length:219316      Mode :logical  
+##  Class :character   Class :character   FALSE:218606   
+##  Mode  :character   Mode  :character   TRUE :710      
 ##                                                       
 ##                                                       
 ##                                                       
 ##  is_calpublic   
 ##  Mode :logical  
-##  FALSE:1905864  
-##  TRUE :10310    
-##                 
+##  FALSE:218126   
+##  TRUE :1190     
 ##                 
 ##                 
 ## </code></pre>
@@ -963,32 +697,2515 @@ analysis.</p>
 IPEDS &lt;- IPEDS |&gt;
   mutate(
     total_students =
-      EFAIANM + EFAIANW +
-      EFASIAM + EFASIAW +
-      EFBKAAM + EFBKAAW +
-      EFHISPM + EFHISPW +
-      EFNHPIM + EFNHPIW +
-      EFWHITM + EFWHITW +
-      EF2MORM + EF2MORW +
-      EFUNKNM + EFUNKNW +
-      EFNRALM + EFNRALW,
-
+      enrollment_m_aian + enrollment_f_aian +
+      enrollment_m_asia + enrollment_f_asia +
+      enrollment_m_bkaa + enrollment_f_bkaa +
+      enrollment_m_hisp + enrollment_f_hisp +
+      enrollment_m_nhpi + enrollment_f_nhpi +
+      enrollment_m_whit + enrollment_f_whit +
+      enrollment_m_2mor + enrollment_f_2mor +
+      enrollment_m_unkn + enrollment_f_unkn +
+      enrollment_m_nral + enrollment_f_nral,
+    
     female_students =
-      EFAIANW + EFASIAW + EFBKAAW +
-      EFHISPW + EFNHPIW + EFWHITW +
-      EF2MORW + EFUNKNW + EFNRALW,
-
-    nhpi_students = EFNHPIM + EFNHPIW
+      enrollment_f_aian + enrollment_f_asia + enrollment_f_bkaa +
+      enrollment_f_hisp + enrollment_f_nhpi + enrollment_f_whit +
+      enrollment_f_2mor + enrollment_f_unkn + enrollment_f_nral,
+    
+    nhpi_students =
+      enrollment_m_nhpi + enrollment_f_nhpi
   )</code></pre>
 <p>There are 8,983 distinct institutions represented in this
 dataset.</p>
-<p>In 2024, Baruch College had 172,868 students enrolled.</p>
+<p>In 2024, Baruch College had 3,585 graduate students enrolled.</p>
+<p>In 2024, Baruch College had 20,081 total students enrolled.</p>
 <p>The institution with the highest number of female students in 2019
-was Western Governors University with 731,896 female students.</p>
-<p>Among institutions with more than 1,000 students, the institution
+was Western Governors University with 88,877 female students.</p>
+<p>Among institutions with over 1,000 total students, the institution
 with the highest proportion of Native Hawaiian or Pacific Islander
-students in 2024 was College of the Marshall Islands with a proportion
-of 99%.</p>
+first-year undergraduates in 2024 was University of Hawaii at Manoa with
+a proportion of 3.00%.</p>
+<p>## Task 6: Exploratory Questions - Table Answers</p>
+<div id="states-with-the-highest-graduate-enrollment" class="section level3">
+<h3>States with the Highest Graduate Enrollment</h3>
+<pre class="r"><code>IPEDS |&gt;
+  filter(level == &quot;all graduate&quot;) |&gt;
+  group_by(state) |&gt;
+  summarise(
+    graduate_students = sum(total_students, na.rm = TRUE),
+    .groups = &quot;drop&quot;
+  ) |&gt;
+  arrange(desc(graduate_students)) |&gt;
+  slice_head(n = 5) |&gt;
+  gt() |&gt;
+  cols_label(
+    state = &quot;State&quot;,
+    graduate_students = &quot;Graduate Students&quot;
+  ) |&gt;
+  fmt_number(columns = graduate_students, decimals = 0) |&gt;
+  tab_header(
+    title = &quot;Top 5 States by Graduate Enrollment&quot;,
+    subtitle = &quot;Total graduate students across all institutions&quot;
+  )</code></pre>
+<div id="eerwhbqaku" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#eerwhbqaku table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#eerwhbqaku thead, #eerwhbqaku tbody, #eerwhbqaku tfoot, #eerwhbqaku tr, #eerwhbqaku td, #eerwhbqaku th {
+border-style: none;
+}
+#eerwhbqaku p {
+margin: 0;
+padding: 0;
+}
+#eerwhbqaku .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#eerwhbqaku .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#eerwhbqaku .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#eerwhbqaku .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#eerwhbqaku .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#eerwhbqaku .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#eerwhbqaku .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#eerwhbqaku .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#eerwhbqaku .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#eerwhbqaku .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#eerwhbqaku .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#eerwhbqaku .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#eerwhbqaku .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#eerwhbqaku .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#eerwhbqaku .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#eerwhbqaku .gt_from_md > :first-child {
+margin-top: 0;
+}
+#eerwhbqaku .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#eerwhbqaku .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#eerwhbqaku .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#eerwhbqaku .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#eerwhbqaku .gt_row_group_first td {
+border-top-width: 2px;
+}
+#eerwhbqaku .gt_row_group_first th {
+border-top-width: 2px;
+}
+#eerwhbqaku .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#eerwhbqaku .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#eerwhbqaku .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#eerwhbqaku .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#eerwhbqaku .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#eerwhbqaku .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#eerwhbqaku .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#eerwhbqaku .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#eerwhbqaku .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#eerwhbqaku .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#eerwhbqaku .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#eerwhbqaku .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#eerwhbqaku .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#eerwhbqaku .gt_left {
+text-align: left;
+}
+#eerwhbqaku .gt_center {
+text-align: center;
+}
+#eerwhbqaku .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#eerwhbqaku .gt_font_normal {
+font-weight: normal;
+}
+#eerwhbqaku .gt_font_bold {
+font-weight: bold;
+}
+#eerwhbqaku .gt_font_italic {
+font-style: italic;
+}
+#eerwhbqaku .gt_super {
+font-size: 65%;
+}
+#eerwhbqaku .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#eerwhbqaku .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#eerwhbqaku .gt_indent_1 {
+text-indent: 5px;
+}
+#eerwhbqaku .gt_indent_2 {
+text-indent: 10px;
+}
+#eerwhbqaku .gt_indent_3 {
+text-indent: 15px;
+}
+#eerwhbqaku .gt_indent_4 {
+text-indent: 20px;
+}
+#eerwhbqaku .gt_indent_5 {
+text-indent: 25px;
+}
+#eerwhbqaku .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#eerwhbqaku div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="2" class="gt_heading gt_title gt_font_normal" style>Top 5 States by Graduate Enrollment</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="2" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Total graduate students across all institutions</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="state">State</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="graduate_students">Graduate Students</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="state" class="gt_row gt_left">CA</td>
+<td headers="graduate_students" class="gt_row gt_right">4,475,614</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">NY</td>
+<td headers="graduate_students" class="gt_row gt_right">3,667,601</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">TX</td>
+<td headers="graduate_students" class="gt_row gt_right">2,911,827</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">IL</td>
+<td headers="graduate_students" class="gt_row gt_right">2,329,612</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">PA</td>
+<td headers="graduate_students" class="gt_row gt_right">2,135,193</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table shows the five states with the highest total graduate
+student enrollment across institutions.</p>
+</div>
+<div id="first-year-undergraduate-enrollment-at-cuny-in-2024" class="section level3">
+<h3>First-Year Undergraduate Enrollment at CUNY in 2024</h3>
+<pre class="r"><code>IPEDS |&gt;
+  filter(
+    is_cuny == TRUE,
+    year == 2024,
+    level == &quot;first year undergrad&quot;
+  ) |&gt;
+  mutate(
+    pct_total = total_students / sum(total_students, na.rm = TRUE)
+  ) |&gt;
+  select(
+    institution_name,
+    total_students,
+    pct_total
+  ) |&gt;
+  arrange(desc(total_students)) |&gt;
+  gt() |&gt;
+  cols_label(
+    institution_name = &quot;Institution&quot;,
+    total_students = &quot;First-Year Undergraduates&quot;,
+    pct_total = &quot;Percent of CUNY Total&quot;
+  ) |&gt;
+  fmt_number(columns = total_students, decimals = 0) |&gt;
+  fmt_percent(columns = pct_total, decimals = 2) |&gt;
+  tab_header(
+    title = &quot;CUNY First-Year Undergraduate Enrollment in 2024&quot;,
+    subtitle = &quot;Institutional counts and share of the CUNY total&quot;
+  )</code></pre>
+<div id="bxaxbypxgw" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#bxaxbypxgw table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#bxaxbypxgw thead, #bxaxbypxgw tbody, #bxaxbypxgw tfoot, #bxaxbypxgw tr, #bxaxbypxgw td, #bxaxbypxgw th {
+border-style: none;
+}
+#bxaxbypxgw p {
+margin: 0;
+padding: 0;
+}
+#bxaxbypxgw .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#bxaxbypxgw .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#bxaxbypxgw .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#bxaxbypxgw .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#bxaxbypxgw .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#bxaxbypxgw .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#bxaxbypxgw .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#bxaxbypxgw .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#bxaxbypxgw .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#bxaxbypxgw .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#bxaxbypxgw .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#bxaxbypxgw .gt_from_md > :first-child {
+margin-top: 0;
+}
+#bxaxbypxgw .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#bxaxbypxgw .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#bxaxbypxgw .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#bxaxbypxgw .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#bxaxbypxgw .gt_row_group_first td {
+border-top-width: 2px;
+}
+#bxaxbypxgw .gt_row_group_first th {
+border-top-width: 2px;
+}
+#bxaxbypxgw .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#bxaxbypxgw .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#bxaxbypxgw .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#bxaxbypxgw .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#bxaxbypxgw .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#bxaxbypxgw .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#bxaxbypxgw .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#bxaxbypxgw .gt_left {
+text-align: left;
+}
+#bxaxbypxgw .gt_center {
+text-align: center;
+}
+#bxaxbypxgw .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#bxaxbypxgw .gt_font_normal {
+font-weight: normal;
+}
+#bxaxbypxgw .gt_font_bold {
+font-weight: bold;
+}
+#bxaxbypxgw .gt_font_italic {
+font-style: italic;
+}
+#bxaxbypxgw .gt_super {
+font-size: 65%;
+}
+#bxaxbypxgw .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#bxaxbypxgw .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#bxaxbypxgw .gt_indent_1 {
+text-indent: 5px;
+}
+#bxaxbypxgw .gt_indent_2 {
+text-indent: 10px;
+}
+#bxaxbypxgw .gt_indent_3 {
+text-indent: 15px;
+}
+#bxaxbypxgw .gt_indent_4 {
+text-indent: 20px;
+}
+#bxaxbypxgw .gt_indent_5 {
+text-indent: 25px;
+}
+#bxaxbypxgw .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#bxaxbypxgw div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_title gt_font_normal" style>CUNY First-Year Undergraduate Enrollment in 2024</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Institutional counts and share of the CUNY total</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="institution_name">Institution</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="total_students">First-Year Undergraduates</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="pct_total">Percent of CUNY Total</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Borough of Manhattan Community College</td>
+<td headers="total_students" class="gt_row gt_right">4,718</td>
+<td headers="pct_total" class="gt_row gt_right">13.29%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY New York City College of Technology</td>
+<td headers="total_students" class="gt_row gt_right">3,585</td>
+<td headers="pct_total" class="gt_row gt_right">10.10%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Hunter College</td>
+<td headers="total_students" class="gt_row gt_right">2,897</td>
+<td headers="pct_total" class="gt_row gt_right">8.16%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY City College</td>
+<td headers="total_students" class="gt_row gt_right">2,543</td>
+<td headers="pct_total" class="gt_row gt_right">7.17%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Bernard M Baruch College</td>
+<td headers="total_students" class="gt_row gt_right">2,532</td>
+<td headers="pct_total" class="gt_row gt_right">7.13%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY LaGuardia Community College</td>
+<td headers="total_students" class="gt_row gt_right">2,406</td>
+<td headers="pct_total" class="gt_row gt_right">6.78%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">College of Staten Island CUNY</td>
+<td headers="total_students" class="gt_row gt_right">2,196</td>
+<td headers="pct_total" class="gt_row gt_right">6.19%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY John Jay College of Criminal Justice</td>
+<td headers="total_students" class="gt_row gt_right">2,128</td>
+<td headers="pct_total" class="gt_row gt_right">6.00%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Queensborough Community College</td>
+<td headers="total_students" class="gt_row gt_right">1,965</td>
+<td headers="pct_total" class="gt_row gt_right">5.54%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Brooklyn College</td>
+<td headers="total_students" class="gt_row gt_right">1,782</td>
+<td headers="pct_total" class="gt_row gt_right">5.02%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Queens College</td>
+<td headers="total_students" class="gt_row gt_right">1,751</td>
+<td headers="pct_total" class="gt_row gt_right">4.93%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Kingsborough Community College</td>
+<td headers="total_students" class="gt_row gt_right">1,615</td>
+<td headers="pct_total" class="gt_row gt_right">4.55%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Lehman College</td>
+<td headers="total_students" class="gt_row gt_right">1,545</td>
+<td headers="pct_total" class="gt_row gt_right">4.35%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Bronx Community College</td>
+<td headers="total_students" class="gt_row gt_right">1,252</td>
+<td headers="pct_total" class="gt_row gt_right">3.53%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Hostos Community College</td>
+<td headers="total_students" class="gt_row gt_right">844</td>
+<td headers="pct_total" class="gt_row gt_right">2.38%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY York College</td>
+<td headers="total_students" class="gt_row gt_right">766</td>
+<td headers="pct_total" class="gt_row gt_right">2.16%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Medgar Evers College</td>
+<td headers="total_students" class="gt_row gt_right">586</td>
+<td headers="pct_total" class="gt_row gt_right">1.65%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Stella and Charles Guttman Community College</td>
+<td headers="total_students" class="gt_row gt_right">367</td>
+<td headers="pct_total" class="gt_row gt_right">1.03%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Graduate School and University Center</td>
+<td headers="total_students" class="gt_row gt_right">12</td>
+<td headers="pct_total" class="gt_row gt_right">0.03%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table shows the number of first-year undergraduate students
+enrolled at each CUNY institution in 2024 and each college’s share of
+the total.</p>
+</div>
+<div id="baruch-undergraduate-enrollment-over-time" class="section level3">
+<h3>Baruch Undergraduate Enrollment Over Time</h3>
+<pre class="r"><code>IPEDS |&gt;
+  filter(
+    str_detect(institution_name, &quot;Baruch&quot;),
+    level == &quot;all undergrad&quot;
+  ) |&gt;
+  arrange(year) |&gt;
+  mutate(
+    pct_change = (total_students - lag(total_students)) / lag(total_students)
+  ) |&gt;
+  select(
+    year,
+    total_students,
+    pct_change
+  ) |&gt;
+  gt() |&gt;
+  cols_label(
+    year = &quot;Year&quot;,
+    total_students = &quot;Undergraduate Enrollment&quot;,
+    pct_change = &quot;Year-over-Year Change&quot;
+  ) |&gt;
+  fmt_number(columns = total_students, decimals = 0) |&gt;
+  fmt_percent(columns = pct_change, decimals = 2) |&gt;
+  tab_header(
+    title = &quot;Baruch Undergraduate Enrollment Over Time&quot;,
+    subtitle = &quot;Total undergraduate students and year-over-year percent change&quot;
+  )</code></pre>
+<div id="kniljeikjp" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#kniljeikjp table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#kniljeikjp thead, #kniljeikjp tbody, #kniljeikjp tfoot, #kniljeikjp tr, #kniljeikjp td, #kniljeikjp th {
+border-style: none;
+}
+#kniljeikjp p {
+margin: 0;
+padding: 0;
+}
+#kniljeikjp .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#kniljeikjp .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#kniljeikjp .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#kniljeikjp .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#kniljeikjp .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#kniljeikjp .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#kniljeikjp .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#kniljeikjp .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#kniljeikjp .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#kniljeikjp .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#kniljeikjp .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#kniljeikjp .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#kniljeikjp .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#kniljeikjp .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#kniljeikjp .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#kniljeikjp .gt_from_md > :first-child {
+margin-top: 0;
+}
+#kniljeikjp .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#kniljeikjp .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#kniljeikjp .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#kniljeikjp .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#kniljeikjp .gt_row_group_first td {
+border-top-width: 2px;
+}
+#kniljeikjp .gt_row_group_first th {
+border-top-width: 2px;
+}
+#kniljeikjp .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#kniljeikjp .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#kniljeikjp .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#kniljeikjp .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#kniljeikjp .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#kniljeikjp .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#kniljeikjp .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#kniljeikjp .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#kniljeikjp .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#kniljeikjp .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#kniljeikjp .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#kniljeikjp .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#kniljeikjp .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#kniljeikjp .gt_left {
+text-align: left;
+}
+#kniljeikjp .gt_center {
+text-align: center;
+}
+#kniljeikjp .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#kniljeikjp .gt_font_normal {
+font-weight: normal;
+}
+#kniljeikjp .gt_font_bold {
+font-weight: bold;
+}
+#kniljeikjp .gt_font_italic {
+font-style: italic;
+}
+#kniljeikjp .gt_super {
+font-size: 65%;
+}
+#kniljeikjp .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#kniljeikjp .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#kniljeikjp .gt_indent_1 {
+text-indent: 5px;
+}
+#kniljeikjp .gt_indent_2 {
+text-indent: 10px;
+}
+#kniljeikjp .gt_indent_3 {
+text-indent: 15px;
+}
+#kniljeikjp .gt_indent_4 {
+text-indent: 20px;
+}
+#kniljeikjp .gt_indent_5 {
+text-indent: 25px;
+}
+#kniljeikjp .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#kniljeikjp div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_title gt_font_normal" style>Baruch Undergraduate Enrollment Over Time</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Total undergraduate students and year-over-year percent change</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="year">Year</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="total_students">Undergraduate Enrollment</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="pct_change">Year-over-Year Change</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="year" class="gt_row gt_right">2010</td>
+<td headers="total_students" class="gt_row gt_right">13,120</td>
+<td headers="pct_change" class="gt_row gt_right">NA</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2011</td>
+<td headers="total_students" class="gt_row gt_right">14,266</td>
+<td headers="pct_change" class="gt_row gt_right">8.73%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2012</td>
+<td headers="total_students" class="gt_row gt_right">13,777</td>
+<td headers="pct_change" class="gt_row gt_right">−3.43%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2013</td>
+<td headers="total_students" class="gt_row gt_right">14,082</td>
+<td headers="pct_change" class="gt_row gt_right">2.21%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2014</td>
+<td headers="total_students" class="gt_row gt_right">14,857</td>
+<td headers="pct_change" class="gt_row gt_right">5.50%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2015</td>
+<td headers="total_students" class="gt_row gt_right">15,254</td>
+<td headers="pct_change" class="gt_row gt_right">2.67%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2016</td>
+<td headers="total_students" class="gt_row gt_right">15,210</td>
+<td headers="pct_change" class="gt_row gt_right">−0.29%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2017</td>
+<td headers="total_students" class="gt_row gt_right">15,253</td>
+<td headers="pct_change" class="gt_row gt_right">0.28%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2018</td>
+<td headers="total_students" class="gt_row gt_right">15,024</td>
+<td headers="pct_change" class="gt_row gt_right">−1.50%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2019</td>
+<td headers="total_students" class="gt_row gt_right">15,482</td>
+<td headers="pct_change" class="gt_row gt_right">3.05%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2020</td>
+<td headers="total_students" class="gt_row gt_right">15,774</td>
+<td headers="pct_change" class="gt_row gt_right">1.89%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2021</td>
+<td headers="total_students" class="gt_row gt_right">15,859</td>
+<td headers="pct_change" class="gt_row gt_right">0.54%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2022</td>
+<td headers="total_students" class="gt_row gt_right">15,896</td>
+<td headers="pct_change" class="gt_row gt_right">0.23%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2023</td>
+<td headers="total_students" class="gt_row gt_right">16,086</td>
+<td headers="pct_change" class="gt_row gt_right">1.20%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2024</td>
+<td headers="total_students" class="gt_row gt_right">16,496</td>
+<td headers="pct_change" class="gt_row gt_right">2.55%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table summarizes Baruch College’s undergraduate enrollment over
+the study period and shows the year-over-year percentage change.</p>
+</div>
+<div id="institutions-with-the-largest-decline-in-white-student-share-2010-to-2020" class="section level3">
+<h3>Institutions with the Largest Decline in White Student Share, 2010
+to 2020</h3>
+<pre class="r"><code>white_decline &lt;- IPEDS |&gt;
+  filter(
+    level == &quot;all undergrad&quot;,
+    year %in% c(2010, 2020)
+  ) |&gt;
+  group_by(institution_name, year) |&gt;
+  summarise(
+    total_students = sum(total_students, na.rm = TRUE),
+    white_students = sum(enrollment_m_whit + enrollment_f_whit, na.rm = TRUE),
+    .groups = &quot;drop&quot;
+  ) |&gt;
+  filter(total_students &gt; 1000) |&gt;
+  mutate(white_share = white_students / total_students) |&gt;
+  select(institution_name, year, white_share) |&gt;
+  pivot_wider(names_from = year, values_from = white_share) |&gt;
+  mutate(change = `2020` - `2010`) |&gt;
+  arrange(change) |&gt;
+  slice_head(n = 5)
+
+white_decline |&gt;
+  gt() |&gt;
+  cols_label(
+    institution_name = &quot;Institution&quot;,
+    `2010` = &quot;White Share (2010)&quot;,
+    `2020` = &quot;White Share (2020)&quot;,
+    change = &quot;Change&quot;
+  ) |&gt;
+  fmt_percent(columns = c(`2010`, `2020`, change), decimals = 2) |&gt;
+  tab_header(
+    title = &quot;Largest Declines in White Undergraduate Share&quot;,
+    subtitle = &quot;Top 5 institutions, 2010 to 2020&quot;
+  )</code></pre>
+<div id="ekskfdgqjg" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ekskfdgqjg table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#ekskfdgqjg thead, #ekskfdgqjg tbody, #ekskfdgqjg tfoot, #ekskfdgqjg tr, #ekskfdgqjg td, #ekskfdgqjg th {
+border-style: none;
+}
+#ekskfdgqjg p {
+margin: 0;
+padding: 0;
+}
+#ekskfdgqjg .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#ekskfdgqjg .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#ekskfdgqjg .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#ekskfdgqjg .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#ekskfdgqjg .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#ekskfdgqjg .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#ekskfdgqjg .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#ekskfdgqjg .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#ekskfdgqjg .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#ekskfdgqjg .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#ekskfdgqjg .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#ekskfdgqjg .gt_from_md > :first-child {
+margin-top: 0;
+}
+#ekskfdgqjg .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#ekskfdgqjg .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#ekskfdgqjg .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ekskfdgqjg .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#ekskfdgqjg .gt_row_group_first td {
+border-top-width: 2px;
+}
+#ekskfdgqjg .gt_row_group_first th {
+border-top-width: 2px;
+}
+#ekskfdgqjg .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ekskfdgqjg .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#ekskfdgqjg .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ekskfdgqjg .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#ekskfdgqjg .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ekskfdgqjg .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#ekskfdgqjg .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ekskfdgqjg .gt_left {
+text-align: left;
+}
+#ekskfdgqjg .gt_center {
+text-align: center;
+}
+#ekskfdgqjg .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#ekskfdgqjg .gt_font_normal {
+font-weight: normal;
+}
+#ekskfdgqjg .gt_font_bold {
+font-weight: bold;
+}
+#ekskfdgqjg .gt_font_italic {
+font-style: italic;
+}
+#ekskfdgqjg .gt_super {
+font-size: 65%;
+}
+#ekskfdgqjg .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#ekskfdgqjg .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#ekskfdgqjg .gt_indent_1 {
+text-indent: 5px;
+}
+#ekskfdgqjg .gt_indent_2 {
+text-indent: 10px;
+}
+#ekskfdgqjg .gt_indent_3 {
+text-indent: 15px;
+}
+#ekskfdgqjg .gt_indent_4 {
+text-indent: 20px;
+}
+#ekskfdgqjg .gt_indent_5 {
+text-indent: 25px;
+}
+#ekskfdgqjg .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#ekskfdgqjg div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_title gt_font_normal" style>Largest Declines in White Undergraduate Share</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Top 5 institutions, 2010 to 2020</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="institution_name">Institution</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2010">White Share (2010)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2020">White Share (2020)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="change">Change</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="institution_name" class="gt_row gt_left">University of the Cumberlands</td>
+<td headers="2010" class="gt_row gt_right">82.25%</td>
+<td headers="2020" class="gt_row gt_right">12.41%</td>
+<td headers="change" class="gt_row gt_right">−69.83%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">New England Institute of Technology</td>
+<td headers="2010" class="gt_row gt_right">66.97%</td>
+<td headers="2020" class="gt_row gt_right">7.92%</td>
+<td headers="change" class="gt_row gt_right">−59.05%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">Saint Joseph&#39;s College of Maine</td>
+<td headers="2010" class="gt_row gt_right">70.73%</td>
+<td headers="2020" class="gt_row gt_right">19.71%</td>
+<td headers="change" class="gt_row gt_right">−51.02%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">Montcalm Community College</td>
+<td headers="2010" class="gt_row gt_right">89.47%</td>
+<td headers="2020" class="gt_row gt_right">46.46%</td>
+<td headers="change" class="gt_row gt_right">−43.00%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">Walsh University</td>
+<td headers="2010" class="gt_row gt_right">81.22%</td>
+<td headers="2020" class="gt_row gt_right">42.16%</td>
+<td headers="change" class="gt_row gt_right">−39.06%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table identifies the five institutions where the fraction of
+white undergraduate students declined the most from 2010 to 2020.</p>
+</div>
+<div id="states-with-the-largest-increase-in-female-undergraduate-share-2010-to-2024" class="section level3">
+<h3>States with the Largest Increase in Female Undergraduate Share, 2010
+to 2024</h3>
+<pre class="r"><code>female_increase &lt;- IPEDS |&gt;
+  filter(
+    level == &quot;all undergrad&quot;,
+    year %in% c(2010, 2024)
+  ) |&gt;
+  group_by(state, year) |&gt;
+  summarise(
+    total_students = sum(total_students, na.rm = TRUE),
+    female_students = sum(
+      enrollment_f_aian + enrollment_f_asia + enrollment_f_bkaa +
+      enrollment_f_hisp + enrollment_f_nhpi + enrollment_f_whit +
+      enrollment_f_2mor + enrollment_f_unkn + enrollment_f_nral,
+      na.rm = TRUE
+    ),
+    .groups = &quot;drop&quot;
+  ) |&gt;
+  mutate(female_share = female_students / total_students) |&gt;
+  select(state, year, female_share) |&gt;
+  pivot_wider(names_from = year, values_from = female_share) |&gt;
+  mutate(change = `2024` - `2010`) |&gt;
+  arrange(desc(change)) |&gt;
+  slice_head(n = 3)
+
+female_increase |&gt;
+  gt() |&gt;
+  cols_label(
+    state = &quot;State&quot;,
+    `2010` = &quot;Female Share (2010)&quot;,
+    `2024` = &quot;Female Share (2024)&quot;,
+    change = &quot;Change&quot;
+  ) |&gt;
+  fmt_percent(columns = c(`2010`, `2024`, change), decimals = 2) |&gt;
+  tab_header(
+    title = &quot;Largest Increases in Female Undergraduate Share&quot;,
+    subtitle = &quot;Top 3 states, 2010 to 2024&quot;
+  )</code></pre>
+<div id="goeqqonoes" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#goeqqonoes table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#goeqqonoes thead, #goeqqonoes tbody, #goeqqonoes tfoot, #goeqqonoes tr, #goeqqonoes td, #goeqqonoes th {
+border-style: none;
+}
+#goeqqonoes p {
+margin: 0;
+padding: 0;
+}
+#goeqqonoes .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#goeqqonoes .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#goeqqonoes .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#goeqqonoes .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#goeqqonoes .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#goeqqonoes .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#goeqqonoes .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#goeqqonoes .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#goeqqonoes .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#goeqqonoes .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#goeqqonoes .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#goeqqonoes .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#goeqqonoes .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#goeqqonoes .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#goeqqonoes .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#goeqqonoes .gt_from_md > :first-child {
+margin-top: 0;
+}
+#goeqqonoes .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#goeqqonoes .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#goeqqonoes .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#goeqqonoes .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#goeqqonoes .gt_row_group_first td {
+border-top-width: 2px;
+}
+#goeqqonoes .gt_row_group_first th {
+border-top-width: 2px;
+}
+#goeqqonoes .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#goeqqonoes .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#goeqqonoes .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#goeqqonoes .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#goeqqonoes .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#goeqqonoes .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#goeqqonoes .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#goeqqonoes .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#goeqqonoes .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#goeqqonoes .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#goeqqonoes .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#goeqqonoes .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#goeqqonoes .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#goeqqonoes .gt_left {
+text-align: left;
+}
+#goeqqonoes .gt_center {
+text-align: center;
+}
+#goeqqonoes .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#goeqqonoes .gt_font_normal {
+font-weight: normal;
+}
+#goeqqonoes .gt_font_bold {
+font-weight: bold;
+}
+#goeqqonoes .gt_font_italic {
+font-style: italic;
+}
+#goeqqonoes .gt_super {
+font-size: 65%;
+}
+#goeqqonoes .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#goeqqonoes .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#goeqqonoes .gt_indent_1 {
+text-indent: 5px;
+}
+#goeqqonoes .gt_indent_2 {
+text-indent: 10px;
+}
+#goeqqonoes .gt_indent_3 {
+text-indent: 15px;
+}
+#goeqqonoes .gt_indent_4 {
+text-indent: 20px;
+}
+#goeqqonoes .gt_indent_5 {
+text-indent: 25px;
+}
+#goeqqonoes .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#goeqqonoes div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_title gt_font_normal" style>Largest Increases in Female Undergraduate Share</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Top 3 states, 2010 to 2024</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="state">State</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2010">Female Share (2010)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2024">Female Share (2024)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="change">Change</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="state" class="gt_row gt_left">FM</td>
+<td headers="2010" class="gt_row gt_right">53.72%</td>
+<td headers="2024" class="gt_row gt_right">62.87%</td>
+<td headers="change" class="gt_row gt_right">9.15%</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">AS</td>
+<td headers="2010" class="gt_row gt_right">61.19%</td>
+<td headers="2024" class="gt_row gt_right">70.23%</td>
+<td headers="change" class="gt_row gt_right">9.03%</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">NH</td>
+<td headers="2010" class="gt_row gt_right">57.28%</td>
+<td headers="2024" class="gt_row gt_right">61.97%</td>
+<td headers="change" class="gt_row gt_right">4.69%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table shows the three states where the fraction of female
+undergraduate students increased the most from 2010 to 2024.</p>
+</div>
+</div>
+<div id="task-7-op-ed-calculations" class="section level2">
+<h2>Task 7: Op-Ed Calculations</h2>
+<pre class="r"><code># Create diversity metrics for undergraduate students
+
+op_ed_data &lt;- IPEDS |&gt;
+  filter(level == &quot;all undergrad&quot;) |&gt;
+  mutate(
+    total_students =
+      enrollment_m_aian + enrollment_f_aian +
+      enrollment_m_asia + enrollment_f_asia +
+      enrollment_m_bkaa + enrollment_f_bkaa +
+      enrollment_m_hisp + enrollment_f_hisp +
+      enrollment_m_nhpi + enrollment_f_nhpi +
+      enrollment_m_whit + enrollment_f_whit +
+      enrollment_m_2mor + enrollment_f_2mor +
+      enrollment_m_unkn + enrollment_f_unkn +
+      enrollment_m_nral + enrollment_f_nral,
+
+    non_white_non_asian =
+      enrollment_m_aian + enrollment_f_aian +
+      enrollment_m_bkaa + enrollment_f_bkaa +
+      enrollment_m_hisp + enrollment_f_hisp +
+      enrollment_m_nhpi + enrollment_f_nhpi +
+      enrollment_m_2mor + enrollment_f_2mor,
+
+    diversity_share = non_white_non_asian / total_students
+  )
+
+# Focus on Baruch College
+baruch_data &lt;- op_ed_data |&gt;
+  filter(str_detect(institution_name, &quot;Baruch&quot;))</code></pre>
+<hr />
+</div>
+<div id="op-ed-building-a-more-inclusive-campus-at-baruch-college" class="section level2">
+<h2>Op-Ed: Building a More Inclusive Campus at Baruch College</h2>
+<p>As president of Baruch College, I believe that diversity is
+fundamental to the educational mission of our institution. Diversity
+strengthens our classrooms, broadens our perspectives, and prepares our
+students to thrive in an increasingly interconnected world. For the
+purposes of this discussion, I define diversity as the share of
+undergraduate students who identify as non-White and non-Asian American.
+This definition reflects the historical disparities that have shaped
+access to higher education in the United States.</p>
+<p>Baruch College currently serves a large and vibrant undergraduate
+community. In 2024 the college enrolled approximately 16,496
+undergraduate students. These students represent a wide range of
+backgrounds, cultures, and life experiences, contributing to a dynamic
+learning environment that prepares graduates for leadership in New York
+City and beyond.</p>
+<p>Examining the incoming first-year class provides insight into how our
+institution is evolving. Over the past several years, the number of
+first-year undergraduate students has fluctuated modestly. These changes
+reflect broader trends in college enrollment nationwide, including
+demographic shifts and the lingering impacts of the COVID-19 pandemic.
+Despite these fluctuations, Baruch continues to attract a strong cohort
+of students committed to academic achievement and civic engagement.</p>
+<p>Looking at the full undergraduate population, we also see important
+demographic trends. The proportion of students who fall within our
+diversity definition has gradually changed over time. In 2010 the share
+of non-White and non-Asian students was approximately 25.54%. By 2024
+this share had changed to 40.34%. While year-to-year changes are often
+small, the long-term trend illustrates the evolving composition of our
+student body.</p>
+<p>It is important to consider these changes in the broader national
+context. Public universities in California have operated under
+restrictions on affirmative action since the passage of Proposition 209
+in 1996. Because these institutions did not experience a policy shift
+following the Supreme Court’s decision in <em>Students for Fair
+Admissions v. Harvard</em>, they provide a useful benchmark for
+evaluating our own enrollment patterns. If the changes we observe at
+Baruch mirror those in California institutions, it suggests that many
+fluctuations may be driven by broader demographic or societal trends
+rather than policy shifts alone.</p>
+<p>Ultimately, diversity is not simply a number or a percentage—it is a
+commitment. At Baruch College, we remain dedicated to expanding
+opportunity, fostering inclusion, and ensuring that every student has
+the chance to succeed. By continuing to evaluate our data and reflect on
+our mission, we can ensure that our campus remains a place where all
+students are empowered to learn, lead, and contribute to our diverse
+society.</p>
+<div class="callout-note" title="AI Usage Statement" collapse="true">
+<p>I used Generative AI tools to assist with the coding portions of this
+mini-project, including troubleshooting R errors, understanding how to
+structure dplyr pipelines, and formatting Quarto code chunks so that the
+document rendered correctly. AI was used only to help debug code and
+explain programming concepts when errors occurred during the analysis
+process. All written analysis, explanations, and the Op-Ed text were
+written independently without the use of Generative AI editing or text
+generation tools, in accordance with the course policy.</p>
+<p>Izabelle Diaz</p>
+</div>
 </div>
 
 
