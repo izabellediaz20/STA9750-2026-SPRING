@@ -25,7 +25,6 @@ Using data analysis tools in R, this report examines enrollment patterns and dem
 ```{r}
 # Load required libraries
 library(tidyverse)
-library(dplyr)
 library(readr)
 library(stringr)
 library(ggplot2)
@@ -132,3 +131,96 @@ IPEDS |>
   distinct(institution_name) |>
   arrange(institution_name)
 ```
+
+## Task 4: Initial EDA Pass
+
+Before beginning deeper analysis, it is helpful to inspect the dataset to understand its structure and verify that the variables were imported correctly.
+
+### Inspecting the structure of the dataset
+
+```{r}
+glimpse(IPEDS)
+```
+
+### Summary statistics
+
+```{r}
+summary(IPEDS)
+```
+
+### Observations
+
+The `glimpse()` output shows the structure of the IPEDS dataset, including the number of rows and columns as well as the data type of each variable. The dataset contains information about institutions, enrollment counts, demographic categories, reporting year, and institutional characteristics such as whether a school belongs to the CUNY system or California public systems.
+
+The `summary()` output provides basic statistics for the variables in the dataset. Numeric variables such as enrollment counts show ranges of values across institutions and years, while categorical variables display the frequency of different categories. These checks confirm that the dataset has been loaded correctly and that the variables appear to be structured appropriately for further analysis.
+
+## Task 5: Exploratory Questions - Inline Values
+
+```{r}
+library(scales)
+
+IPEDS <- IPEDS |>
+  mutate(
+    total_students =
+      EFAIANM + EFAIANW +
+      EFASIAM + EFASIAW +
+      EFBKAAM + EFBKAAW +
+      EFHISPM + EFHISPW +
+      EFNHPIM + EFNHPIW +
+      EFWHITM + EFWHITW +
+      EF2MORM + EF2MORW +
+      EFUNKNM + EFUNKNW +
+      EFNRALM + EFNRALW,
+
+    female_students =
+      EFAIANW + EFASIAW + EFBKAAW +
+      EFHISPW + EFNHPIW + EFWHITW +
+      EF2MORW + EFUNKNW + EFNRALW,
+
+    nhpi_students = EFNHPIM + EFNHPIW
+  )
+```
+
+There are `r comma(n_distinct(IPEDS$institution_id))` distinct institutions represented in this dataset.
+
+In 2024, Baruch College had `r comma(IPEDS |>
+  filter(str_detect(institution_name, "Baruch"),
+         year == 2024) |>
+  summarise(sum(total_students, na.rm = TRUE)) |>
+  pull())` students enrolled.
+
+The institution with the highest number of female students in 2019 was `r IPEDS |>
+  filter(year == 2019) |>
+  group_by(institution_name) |>
+  summarise(total_female = sum(female_students, na.rm = TRUE)) |>
+  arrange(desc(total_female)) |>
+  slice(1) |>
+  pull(institution_name)` with `r comma(IPEDS |>
+  filter(year == 2019) |>
+  group_by(institution_name) |>
+  summarise(total_female = sum(female_students, na.rm = TRUE)) |>
+  arrange(desc(total_female)) |>
+  slice(1) |>
+  pull(total_female))` female students.
+
+Among institutions with more than 1,000 students, the institution with the highest proportion of Native Hawaiian or Pacific Islander students in 2024 was `r IPEDS |>
+  filter(year == 2024) |>
+  group_by(institution_name) |>
+  summarise(total = sum(total_students, na.rm = TRUE),
+            nhpi = sum(nhpi_students, na.rm = TRUE)) |>
+  filter(total > 1000) |>
+  mutate(frac = nhpi / total) |>
+  arrange(desc(frac)) |>
+  slice(1) |>
+  pull(institution_name)` with a proportion of `r percent(IPEDS |>
+  filter(year == 2024) |>
+  group_by(institution_name) |>
+  summarise(total = sum(total_students, na.rm = TRUE),
+            nhpi = sum(nhpi_students, na.rm = TRUE)) |>
+  filter(total > 1000) |>
+  mutate(frac = nhpi / total) |>
+  arrange(desc(frac)) |>
+  slice(1) |>
+  pull(frac))`.
+  
+  

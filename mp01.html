@@ -380,7 +380,6 @@ States.</p>
 <h2>Setup</h2>
 <pre class="r"><code># Load required libraries
 library(tidyverse)
-library(dplyr)
 library(readr)
 library(stringr)
 library(ggplot2)
@@ -521,6 +520,475 @@ IPEDS |&gt;
 ##  9 California State University-Fullerton       
 ## 10 California State University-Long Beach      
 ## # ℹ 21 more rows</code></pre>
+</div>
+<div id="task-4-initial-eda-pass" class="section level2">
+<h2>Task 4: Initial EDA Pass</h2>
+<p>Before beginning deeper analysis, it is helpful to inspect the
+dataset to understand its structure and verify that the variables were
+imported correctly.</p>
+<div id="inspecting-the-structure-of-the-dataset" class="section level3">
+<h3>Inspecting the structure of the dataset</h3>
+<pre class="r"><code>glimpse(IPEDS)</code></pre>
+<pre><code>## Rows: 1,916,174
+## Columns: 83
+## $ institution_id   &lt;dbl&gt; 100654, 100654, 100654, 1006…
+## $ year             &lt;int&gt; 2010, 2010, 2010, 2010, 2010…
+## $ UNITID           &lt;dbl&gt; 100654, 100654, 100654, 1006…
+## $ EFALEVEL         &lt;dbl&gt; 1, 2, 3, 4, 5, 11, 12, 19, 2…
+## $ LINE             &lt;dbl&gt; 29, 99, 99, 99, 99, 99, 99, …
+## $ SECTION          &lt;dbl&gt; 3, 3, 3, 3, 3, 3, 3, 3, 3, 1…
+## $ LSTUDY           &lt;dbl&gt; 4, 1, 1, 1, 1, 1, 3, 1, 1, 4…
+## $ XEFTOTLT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFTOTLT          &lt;dbl&gt; 5814, 4940, 4930, 1123, 3807…
+## $ XEFTOTLM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFTOTLM          &lt;dbl&gt; 2644, 2355, 2352, 548, 1804,…
+## $ XEFTOTLW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFTOTLW          &lt;dbl&gt; 3170, 2585, 2578, 575, 2003,…
+## $ XEFAIANT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFAIANT          &lt;dbl&gt; 5, 3, 3, 0, 3, 0, 2, 0, 3, 2…
+## $ XEFAIANM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFAIANM          &lt;dbl&gt; 4, 2, 2, 0, 2, 0, 2, 0, 2, 1…
+## $ XEFAIANW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFAIANW          &lt;dbl&gt; 1, 1, 1, 0, 1, 0, 0, 0, 1, 1…
+## $ XEFASIAT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFASIAT          &lt;dbl&gt; 21, 9, 9, 1, 8, 0, 12, 1, 7,…
+## $ XEFASIAM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFASIAM          &lt;dbl&gt; 6, 2, 2, 0, 2, 0, 4, 1, 1, 3…
+## $ XEFASIAW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFASIAW          &lt;dbl&gt; 15, 7, 7, 1, 6, 0, 8, 0, 6, …
+## $ XEFBKAAT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFBKAAT          &lt;dbl&gt; 5377, 4748, 4741, 1082, 3659…
+## $ XEFBKAAM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFBKAAM          &lt;dbl&gt; 2449, 2250, 2248, 527, 1721,…
+## $ XEFBKAAW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFBKAAW          &lt;dbl&gt; 2928, 2498, 2493, 555, 1938,…
+## $ XEFHISPT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFHISPT          &lt;dbl&gt; 18, 16, 16, 4, 12, 0, 2, 3, …
+## $ XEFHISPM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFHISPM          &lt;dbl&gt; 9, 9, 9, 3, 6, 0, 0, 1, 5, 8…
+## $ XEFHISPW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFHISPW          &lt;dbl&gt; 9, 7, 7, 1, 6, 0, 2, 2, 4, 5…
+## $ XEFNHPIT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFNHPIT          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ XEFNHPIM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFNHPIM          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ XEFNHPIW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFNHPIW          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ XEFWHITT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFWHITT          &lt;dbl&gt; 273, 101, 98, 16, 82, 3, 172…
+## $ XEFWHITM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFWHITM          &lt;dbl&gt; 106, 59, 58, 7, 51, 1, 47, 1…
+## $ XEFWHITW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFWHITW          &lt;dbl&gt; 167, 42, 40, 9, 31, 2, 125, …
+## $ XEF2MORT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EF2MORT          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ XEF2MORM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EF2MORM          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ XEF2MORW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EF2MORW          &lt;dbl&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ XEFUNKNT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFUNKNT          &lt;dbl&gt; 24, 20, 20, 16, 4, 0, 4, 2, …
+## $ XEFUNKNM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFUNKNM          &lt;dbl&gt; 10, 10, 10, 9, 1, 0, 0, 1, 0…
+## $ XEFUNKNW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFUNKNW          &lt;dbl&gt; 14, 10, 10, 7, 3, 0, 4, 1, 2…
+## $ XEFNRALT         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFNRALT          &lt;dbl&gt; 96, 43, 43, 4, 39, 0, 53, 5,…
+## $ XEFNRALM         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFNRALM          &lt;dbl&gt; 60, 23, 23, 2, 21, 0, 37, 1,…
+## $ XEFNRALW         &lt;chr&gt; &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;, &quot;R&quot;…
+## $ EFNRALW          &lt;dbl&gt; 36, 20, 20, 2, 18, 0, 16, 4,…
+## $ XEFGNDRU...68    &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ EFGNDRUN         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ XEFGNDRA         &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ EFGNDRAN         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ XEFGNDRU...72    &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ EFGNDRUA         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ XEFGNDRK         &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ EFGNDRKN         &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ XEFGNDRUN        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ XEFGNDRAN        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ XEFGNDRUA        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ XEFGNDRKN        &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, …
+## $ institution_name &lt;chr&gt; &quot;Alabama A &amp; M University&quot;, …
+## $ state            &lt;chr&gt; &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;…
+## $ is_cuny          &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, …
+## $ is_calpublic     &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, …</code></pre>
+</div>
+<div id="summary-statistics" class="section level3">
+<h3>Summary statistics</h3>
+<pre class="r"><code>summary(IPEDS)</code></pre>
+<pre><code>##  institution_id        year          UNITID      
+##  Min.   :100654   Min.   :2010   Min.   :100654  
+##  1st Qu.:164216   1st Qu.:2013   1st Qu.:164216  
+##  Median :212197   Median :2016   Median :212197  
+##  Mean   :264673   Mean   :2017   Mean   :264673  
+##  3rd Qu.:420556   3rd Qu.:2020   3rd Qu.:420556  
+##  Max.   :500555   Max.   :2024   Max.   :500555  
+##                                                  
+##     EFALEVEL          LINE          SECTION     
+##  Min.   : 1.00   Min.   : 1.00   Min.   :1.000  
+##  1st Qu.: 5.00   1st Qu.:11.00   1st Qu.:1.000  
+##  Median :23.00   Median :25.00   Median :2.000  
+##  Mean   :25.56   Mean   :48.06   Mean   :2.008  
+##  3rd Qu.:41.00   3rd Qu.:99.00   3rd Qu.:3.000  
+##  Max.   :60.00   Max.   :99.00   Max.   :3.000  
+##                                                 
+##      LSTUDY        XEFTOTLT            EFTOTLT      
+##  Min.   :1.000   Length:1916174     Min.   :     1  
+##  1st Qu.:1.000   Class :character   1st Qu.:    47  
+##  Median :1.000   Mode  :character   Median :   199  
+##  Mean   :1.522                      Mean   :  1353  
+##  3rd Qu.:1.000                      3rd Qu.:   975  
+##  Max.   :4.000                      Max.   :307965  
+##                                                     
+##    XEFTOTLM            EFTOTLM       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    8.0  
+##  Mode  :character   Median :   65.0  
+##                     Mean   :  579.8  
+##                     3rd Qu.:  401.0  
+##                     Max.   :90693.0  
+##                                      
+##    XEFTOTLW            EFTOTLW        
+##  Length:1916174     Min.   :     0.0  
+##  Class :character   1st Qu.:    28.0  
+##  Mode  :character   Median :   122.0  
+##                     Mean   :   773.5  
+##                     3rd Qu.:   571.0  
+##                     Max.   :218234.0  
+##                                       
+##    XEFAIANT            EFAIANT        
+##  Length:1916174     Min.   :   0.000  
+##  Class :character   1st Qu.:   0.000  
+##  Mode  :character   Median :   1.000  
+##                     Mean   :   9.769  
+##                     3rd Qu.:   5.000  
+##                     Max.   :2973.000  
+##                                       
+##    XEFAIANM            EFAIANM        
+##  Length:1916174     Min.   :   0.000  
+##  Class :character   1st Qu.:   0.000  
+##  Mode  :character   Median :   0.000  
+##                     Mean   :   3.794  
+##                     3rd Qu.:   2.000  
+##                     Max.   :1498.000  
+##                                       
+##    XEFAIANW            EFAIANW        
+##  Length:1916174     Min.   :   0.000  
+##  Class :character   1st Qu.:   0.000  
+##  Mode  :character   Median :   0.000  
+##                     Mean   :   5.975  
+##                     3rd Qu.:   3.000  
+##                     Max.   :2016.000  
+##                                       
+##    XEFASIAT            EFASIAT        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    3.00  
+##                     Mean   :   82.33  
+##                     3rd Qu.:   21.00  
+##                     Max.   :15175.00  
+##                                       
+##    XEFASIAM            EFASIAM       
+##  Length:1916174     Min.   :   0.00  
+##  Class :character   1st Qu.:   0.00  
+##  Mode  :character   Median :   1.00  
+##                     Mean   :  38.43  
+##                     3rd Qu.:   9.00  
+##                     Max.   :9495.00  
+##                                      
+##    XEFASIAW            EFASIAW      
+##  Length:1916174     Min.   :   0.0  
+##  Class :character   1st Qu.:   0.0  
+##  Mode  :character   Median :   2.0  
+##                     Mean   :  43.9  
+##                     3rd Qu.:  12.0  
+##                     Max.   :7749.0  
+##                                     
+##    XEFBKAAT            EFBKAAT       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    3.0  
+##  Mode  :character   Median :   21.0  
+##                     Mean   :  174.1  
+##                     3rd Qu.:  101.0  
+##                     Max.   :58927.0  
+##                                      
+##    XEFBKAAM            EFBKAAM        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    6.00  
+##                     Mean   :   63.58  
+##                     3rd Qu.:   38.00  
+##                     Max.   :13019.00  
+##                                       
+##    XEFBKAAW            EFBKAAW       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    1.0  
+##  Mode  :character   Median :   11.0  
+##                     Mean   :  110.5  
+##                     3rd Qu.:   60.0  
+##                     Max.   :45908.0  
+##                                      
+##    XEFHISPT            EFHISPT       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    2.0  
+##  Mode  :character   Median :   17.0  
+##                     Mean   :  248.9  
+##                     3rd Qu.:  101.0  
+##                     Max.   :46806.0  
+##                                      
+##    XEFHISPM            EFHISPM       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    0.0  
+##  Mode  :character   Median :    5.0  
+##                     Mean   :  102.3  
+##                     3rd Qu.:   38.0  
+##                     Max.   :19464.0  
+##                                      
+##    XEFHISPW            EFHISPW       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    1.0  
+##  Mode  :character   Median :   10.0  
+##                     Mean   :  146.6  
+##                     3rd Qu.:   60.0  
+##                     Max.   :27342.0  
+##                                      
+##    XEFNHPIT            EFNHPIT        
+##  Length:1916174     Min.   :   0.000  
+##  Class :character   1st Qu.:   0.000  
+##  Mode  :character   Median :   0.000  
+##                     Mean   :   4.178  
+##                     3rd Qu.:   2.000  
+##                     Max.   :2910.000  
+##                                       
+##    XEFNHPIM            EFNHPIM        
+##  Length:1916174     Min.   :   0.000  
+##  Class :character   1st Qu.:   0.000  
+##  Mode  :character   Median :   0.000  
+##                     Mean   :   1.821  
+##                     3rd Qu.:   1.000  
+##                     Max.   :1354.000  
+##                                       
+##    XEFNHPIW            EFNHPIW        
+##  Length:1916174     Min.   :   0.000  
+##  Class :character   1st Qu.:   0.000  
+##  Mode  :character   Median :   0.000  
+##                     Mean   :   2.357  
+##                     3rd Qu.:   1.000  
+##                     Max.   :1556.000  
+##                                       
+##    XEFWHITT            EFWHITT        
+##  Length:1916174     Min.   :     0.0  
+##  Class :character   1st Qu.:    14.0  
+##  Mode  :character   Median :    76.0  
+##                     Mean   :   674.3  
+##                     3rd Qu.:   465.0  
+##                     Max.   :126662.0  
+##                                       
+##    XEFWHITM            EFWHITM       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    2.0  
+##  Mode  :character   Median :   23.0  
+##                     Mean   :  295.5  
+##                     3rd Qu.:  192.0  
+##                     Max.   :42802.0  
+##                                      
+##    XEFWHITW            EFWHITW       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    8.0  
+##  Mode  :character   Median :   46.0  
+##                     Mean   :  378.7  
+##                     3rd Qu.:  268.0  
+##                     Max.   :88076.0  
+##                                      
+##    XEF2MORT            EF2MORT        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    3.00  
+##                     Mean   :   43.53  
+##                     3rd Qu.:   23.00  
+##                     Max.   :19039.00  
+##                                       
+##    XEF2MORM            EF2MORM       
+##  Length:1916174     Min.   :   0.00  
+##  Class :character   1st Qu.:   0.00  
+##  Mode  :character   Median :   1.00  
+##                     Mean   :  18.18  
+##                     3rd Qu.:   9.00  
+##                     Max.   :5507.00  
+##                                      
+##    XEF2MORW            EF2MORW        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    2.00  
+##                     Mean   :   25.34  
+##                     3rd Qu.:   13.00  
+##                     Max.   :13532.00  
+##                                       
+##    XEFUNKNT            EFUNKNT        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    4.00  
+##                     Mean   :   66.87  
+##                     3rd Qu.:   31.00  
+##                     Max.   :89858.00  
+##                                       
+##    XEFUNKNM            EFUNKNM        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    1.00  
+##                     Mean   :   29.57  
+##                     3rd Qu.:   12.00  
+##                     Max.   :31387.00  
+##                                       
+##    XEFUNKNW            EFUNKNW       
+##  Length:1916174     Min.   :    0.0  
+##  Class :character   1st Qu.:    0.0  
+##  Mode  :character   Median :    2.0  
+##                     Mean   :   37.3  
+##                     3rd Qu.:   17.0  
+##                     Max.   :62271.0  
+##                                      
+##    XEFNRALT            EFNRALT        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    0.00  
+##                     Mean   :   49.39  
+##                     3rd Qu.:    9.00  
+##                     Max.   :19693.00  
+##                                       
+##    XEFNRALM            EFNRALM       
+##  Length:1916174     Min.   :   0.00  
+##  Class :character   1st Qu.:   0.00  
+##  Mode  :character   Median :   0.00  
+##                     Mean   :  26.64  
+##                     3rd Qu.:   4.00  
+##                     Max.   :9415.00  
+##                                      
+##    XEFNRALW            EFNRALW        
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    0.00  
+##                     Mean   :   22.75  
+##                     3rd Qu.:    4.00  
+##                     Max.   :10278.00  
+##                                       
+##  XEFGNDRU...68         EFGNDRUN       
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    0.00  
+##                     Mean   :   31.46  
+##                     3rd Qu.:    0.00  
+##                     Max.   :14868.00  
+##                     NA&#39;s   :1875373   
+##    XEFGNDRA            EFGNDRAN      
+##  Length:1916174     Min.   :   0.00  
+##  Class :character   1st Qu.:   0.00  
+##  Mode  :character   Median :   0.00  
+##                     Mean   :  18.99  
+##                     3rd Qu.:   0.00  
+##                     Max.   :1754.00  
+##                     NA&#39;s   :1903175  
+##  XEFGNDRU...72         EFGNDRUA       
+##  Length:1916174     Min.   :    0.00  
+##  Class :character   1st Qu.:    0.00  
+##  Mode  :character   Median :    0.00  
+##                     Mean   :   38.87  
+##                     3rd Qu.:    1.00  
+##                     Max.   :14868.00  
+##                     NA&#39;s   :1879307   
+##    XEFGNDRK            EFGNDRKN      
+##  Length:1916174     Min.   :     0   
+##  Class :character   1st Qu.:   115   
+##  Mode  :character   Median :   518   
+##                     Mean   :  2864   
+##                     3rd Qu.:  2461   
+##                     Max.   :197477   
+##                     NA&#39;s   :1879307  
+##   XEFGNDRUN          XEFGNDRAN        
+##  Length:1916174     Length:1916174    
+##  Class :character   Class :character  
+##  Mode  :character   Mode  :character  
+##                                       
+##                                       
+##                                       
+##                                       
+##   XEFGNDRUA          XEFGNDRKN        
+##  Length:1916174     Length:1916174    
+##  Class :character   Class :character  
+##  Mode  :character   Mode  :character  
+##                                       
+##                                       
+##                                       
+##                                       
+##  institution_name      state            is_cuny       
+##  Length:1916174     Length:1916174     Mode :logical  
+##  Class :character   Class :character   FALSE:1909063  
+##  Mode  :character   Mode  :character   TRUE :7111     
+##                                                       
+##                                                       
+##                                                       
+##                                                       
+##  is_calpublic   
+##  Mode :logical  
+##  FALSE:1905864  
+##  TRUE :10310    
+##                 
+##                 
+##                 
+## </code></pre>
+</div>
+<div id="observations" class="section level3">
+<h3>Observations</h3>
+<p>The <code>glimpse()</code> output shows the structure of the IPEDS
+dataset, including the number of rows and columns as well as the data
+type of each variable. The dataset contains information about
+institutions, enrollment counts, demographic categories, reporting year,
+and institutional characteristics such as whether a school belongs to
+the CUNY system or California public systems.</p>
+<p>The <code>summary()</code> output provides basic statistics for the
+variables in the dataset. Numeric variables such as enrollment counts
+show ranges of values across institutions and years, while categorical
+variables display the frequency of different categories. These checks
+confirm that the dataset has been loaded correctly and that the
+variables appear to be structured appropriately for further
+analysis.</p>
+</div>
+</div>
+<div id="task-5-exploratory-questions---inline-values" class="section level2">
+<h2>Task 5: Exploratory Questions - Inline Values</h2>
+<pre class="r"><code>library(scales)
+
+IPEDS &lt;- IPEDS |&gt;
+  mutate(
+    total_students =
+      EFAIANM + EFAIANW +
+      EFASIAM + EFASIAW +
+      EFBKAAM + EFBKAAW +
+      EFHISPM + EFHISPW +
+      EFNHPIM + EFNHPIW +
+      EFWHITM + EFWHITW +
+      EF2MORM + EF2MORW +
+      EFUNKNM + EFUNKNW +
+      EFNRALM + EFNRALW,
+
+    female_students =
+      EFAIANW + EFASIAW + EFBKAAW +
+      EFHISPW + EFNHPIW + EFWHITW +
+      EF2MORW + EFUNKNW + EFNRALW,
+
+    nhpi_students = EFNHPIM + EFNHPIW
+  )</code></pre>
+<p>There are 8,983 distinct institutions represented in this
+dataset.</p>
+<p>In 2024, Baruch College had 172,868 students enrolled.</p>
+<p>The institution with the highest number of female students in 2019
+was Western Governors University with 731,896 female students.</p>
+<p>Among institutions with more than 1,000 students, the institution
+with the highest proportion of Native Hawaiian or Pacific Islander
+students in 2024 was College of the Marshall Islands with a proportion
+of 99%.</p>
 </div>
 
 
