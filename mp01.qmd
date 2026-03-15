@@ -1,8 +1,9 @@
 ---
 title: "STA 9750 Mini Project #01"
 author: "Izabelle Diaz"
-format: 
+format:
   html:
+    theme: cosmo
     toc: true
     code-fold: true
 execute:
