@@ -515,8 +515,8 @@ Ultimately, diversity is not simply a number or a percentage—it is a commitmen
 
 ::: {.callout-note title="AI Usage Statement" collapse="true"}
 
-I used Generative AI tools to assist with the coding portions of this mini-project, including troubleshooting R errors, understanding how to structure dplyr pipelines, and formatting Quarto code chunks so that the document rendered correctly. AI was used only to help debug code and explain programming concepts when errors occurred during the analysis process. All written analysis, explanations, and the Op-Ed text were written independently without the use of Generative AI editing or text generation tools, in accordance with the course policy.
+I used Generative AI tools only to assist with coding-related tasks while completing this mini-project. AI was used to help troubleshoot R errors, understand how to structure dplyr pipelines, and format Quarto code chunks so the document rendered correctly. All written analysis, explanations, and the Op-Ed text were written independently without the use of Generative AI text generation or editing tools, in accordance with the course policy.
 
 Izabelle Diaz
 
-:::
+:::S
