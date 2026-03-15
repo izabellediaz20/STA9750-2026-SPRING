@@ -12,7 +12,7 @@
 <meta name="author" content="Izabelle Diaz" />
 
 
-<title>Mini Project 01</title>
+<title>STA 9750 Mini Project #01</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -254,6 +254,8 @@ if (window.hljs) {
 
 
 
+
+
 <style type="text/css">
 .main-container {
 max-width: 940px;
@@ -335,22 +337,7 @@ display: none;
 
 </head>
 
-<style>
-.callout-note {
-  border-left: 6px solid #2F80ED;
-  background-color: #EAF2FF;
-  padding: 1rem;
-  margin: 1rem 0;
-  border-radius: 6px;
-}
-.callout-note h2 {
-  margin-top: 0;
-}
-</style>
-
-</head>
- 
-  <body>
+<body>
 
 
 <div class="container-fluid main-container">
@@ -362,672 +349,418 @@ display: none;
 
 
 
-<h1 class="title toc-ignore">Mini Project 01</h1>
+<h1 class="title toc-ignore">STA 9750 Mini Project #01</h1>
 <h4 class="author">Izabelle Diaz</h4>
 
 </div>
 
 
-<pre class="r"><code>library(tidyverse)
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>In 2023, the U.S. Supreme Court ruled in <em>Students for Fair
+Admissions v. Harvard</em> (SFFA) that race-conscious admissions
+policies violated the Equal Protection Clause of the Fourteenth
+Amendment. This decision significantly changed how universities approach
+admissions and raised questions about how the ruling might affect
+student diversity across institutions.</p>
+<p>This project analyzes admissions and enrollment data from the
+Integrated Postsecondary Education Data System (IPEDS), maintained by
+the U.S. Department of Education. The dataset provides detailed
+information on college enrollment, including demographic characteristics
+of students across institutions.</p>
+<p>Using data analysis tools in R, this report examines enrollment
+patterns and demographic trends in higher education institutions before
+and after the SFFA decision. The goal is to explore whether the removal
+of race-conscious admissions policies has had any observable impact on
+the composition of student populations at universities across the United
+States.</p>
+<hr />
+</div>
+<div id="setup" class="section level2">
+<h2>Setup</h2>
+<pre class="r"><code># Load required libraries
+library(tidyverse)
+library(readr)
 library(stringr)
+library(ggplot2)
 library(gt)
-library(skimr)
 
-# load provided dataset (no downloads needed)
-IPEDS &lt;- read_csv(&quot;IPEDS_sample.csv&quot;)</code></pre>
-<pre><code>## Rows: 8 Columns: 16
-## ── Column specification ──────────────────────────────
-## Delimiter: &quot;,&quot;
-## chr  (1): institution_name
-## dbl (15): year, enrollment_m_whit, enrollment_f_wh...
-## 
-## ℹ Use `spec()` to retrieve the full column specification for this data.
-## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
-<pre class="r"><code>head(IPEDS)</code></pre>
-<pre><code>## # A tibble: 6 × 16
-##    year institution_name    enrollment_m_whit
-##   &lt;dbl&gt; &lt;chr&gt;                           &lt;dbl&gt;
-## 1  2021 CUNY Baruch College              1200
-## 2  2022 CUNY Baruch College              1150
-## 3  2023 CUNY Baruch College              1100
-## 4  2024 CUNY Baruch College              1080
-## 5  2021 Other University                 5000
-## 6  2022 Other University                 4900
-## # ℹ 13 more variables: enrollment_f_whit &lt;dbl&gt;,
-## #   enrollment_m_blck &lt;dbl&gt;, enrollment_f_blck &lt;dbl&gt;,
-## #   enrollment_m_hisp &lt;dbl&gt;, enrollment_f_hisp &lt;dbl&gt;,
-## #   enrollment_m_asian &lt;dbl&gt;,
-## #   enrollment_f_asian &lt;dbl&gt;,
-## #   enrollment_m_aian &lt;dbl&gt;, enrollment_f_aian &lt;dbl&gt;,
-## #   enrollment_m_nhpi &lt;dbl&gt;, …</code></pre>
-<p>#’ Acquire IPEDS Data for MP#01 #’ #’ This function will acquire and
-standardize all data for MP#01 #’ from IPEDS (<a href="https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx" class="uri">https://nces.ed.gov/ipeds/datacenter/DataFiles.aspx</a>) #’
-#’ We’re starting in 2010 as the data seems to be reasonably complete #’
-after that point. acquire_ipeds_data &lt;- function(start_year=2010,
-end_year=2024){ library(tidyverse) library(glue)</p>
-<pre><code>data_dir &lt;- file.path(&quot;data&quot;, &quot;mp01&quot;)
+# Load course helper functions
+source(&quot;https://michael-weylandt.com/STA9750/load_helpers.R&quot;)</code></pre>
+</div>
+<div id="data-acquisition" class="section level2">
+<h2>Data Acquisition</h2>
+<p>The following code downloads enrollment and institutional data from
+the Integrated Postsecondary Education Data System (IPEDS). To make the
+process efficient, the data are saved locally in the
+<code>data/mp01</code> folder so the files do not need to be downloaded
+again if the analysis is rerun.</p>
+<pre class="r"><code># Acquire IPEDS Data for MP#01
 
-if(!dir.exists(data_dir)){
-    dir.create(data_dir, showWarnings=FALSE, recursive=TRUE)
+acquire_ipeds_data &lt;- function(start_year=2010, end_year=2024){
+    library(tidyverse)
+    library(glue)
+    
+    data_dir &lt;- file.path(&quot;data&quot;, &quot;mp01&quot;)
+    
+    if(!dir.exists(data_dir)){
+        dir.create(data_dir, showWarnings=FALSE, recursive=TRUE)
+    }
+    
+    YEARS &lt;- seq(start_year, end_year)
+    
+    EFA_ALL &lt;- map(YEARS, function(yy){
+        if(yy &lt;= 2022){
+            ef_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/datacenter/data/EF{yy}A.zip&quot;)
+        } else {
+            ef_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/data-generator?year={yy}&amp;tableName=EF{yy}A&amp;HasRV=0&amp;type=csv&quot;)
+        }
+        
+        ef_file &lt;- file.path(data_dir, glue(&quot;ef{yy}a.csv.zip&quot;))
+        
+        if(!file.exists(ef_file)){
+            message(glue(&quot;Downloading Enrollment Data for {yy} from {ef_url}&quot;))
+            download.file(ef_url, destfile = ef_file, quiet=TRUE, mode=&quot;wb&quot;)    
+        }
+        
+        read_csv(ef_file, show_col_types=FALSE) |&gt;
+            mutate(
+                year = yy,
+                enrollment_m_aian = EFAIANM,
+                enrollment_f_aian = EFAIANW,
+                enrollment_m_asia = EFASIAM,
+                enrollment_f_asia = EFASIAW,
+                enrollment_m_bkaa = EFBKAAM,
+                enrollment_f_bkaa = EFBKAAW,
+                enrollment_m_hisp = EFHISPM,
+                enrollment_f_hisp = EFHISPW,
+                enrollment_m_nhpi = EFNHPIM,
+                enrollment_f_nhpi = EFNHPIW,
+                enrollment_m_whit = EFWHITM,
+                enrollment_f_whit = EFWHITW,
+                enrollment_m_2mor = EF2MORM,
+                enrollment_f_2mor = EF2MORW,
+                enrollment_m_unkn = EFUNKNM,
+                enrollment_f_unkn = EFUNKNW,
+                enrollment_m_nral = EFNRALM,
+                enrollment_f_nral = EFNRALW
+            ) |&gt;
+            filter(
+                (EFALEVEL %in% c(2, 12)) | (LINE %in% c(1, 15))
+            ) |&gt;
+            mutate(
+                level = case_when(
+                    EFALEVEL == 2 ~ &quot;all undergrad&quot;,
+                    EFALEVEL == 12 ~ &quot;all graduate&quot;,
+                    LINE %in% c(1, 15) ~ &quot;first year undergrad&quot;
+                )
+            ) |&gt;
+            select(
+                institution_id = UNITID,
+                year,
+                level,
+                starts_with(&quot;enrollment_&quot;)
+            ) |&gt;
+            group_by(institution_id, year, level) |&gt;
+            summarize(across(starts_with(&quot;enrollment_&quot;), sum), .groups = &quot;drop&quot;)
+        
+    }) |&gt; bind_rows()
+    
+    DESC_ALL &lt;- map(YEARS, function(yy){
+        if(yy &lt;= 2022){
+            hd_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/datacenter/data/HD{yy}.zip&quot;)
+        } else {
+            hd_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/data-generator?year={yy}&amp;tableName=HD{yy}&amp;HasRV=0&amp;type=csv&quot;)
+        }
+        
+        hd_file &lt;- file.path(data_dir, glue(&quot;hd{yy}.csv.zip&quot;))
+        
+        if(!file.exists(hd_file)){
+            message(glue(&quot;Downloading Institutional Descriptions for {yy} from {hd_url}&quot;))
+            download.file(hd_url, destfile = hd_file, quiet=TRUE, mode=&quot;wb&quot;)    
+        }
+        
+        suppressWarnings(
+            read_csv(
+                hd_file,
+                show_col_types=FALSE,
+                locale=locale(encoding=if_else(yy == 2024, &quot;utf-8&quot;, &quot;windows-1252&quot;))
+            ) |&gt;
+            mutate(year = yy) |&gt;
+            select(
+                institution_id = UNITID,
+                institution_name = INSTNM,
+                state = STABBR,
+                year
+            )
+        )
+        
+    }) |&gt; bind_rows()
+    
+    inner_join(
+        EFA_ALL,
+        DESC_ALL,
+        by = c(&quot;institution_id&quot;, &quot;year&quot;)
+    )
 }
 
-YEARS &lt;- seq(start_year, end_year)
-
-EFA_ALL &lt;- map(YEARS, function(yy){
-    if(yy &lt;= 2022){
-        ef_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/datacenter/data/EF{yy}A.zip&quot;)
-        
-    } else {
-        ef_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/data-generator?year={yy}&amp;tableName=EF{yy}A&amp;HasRV=0&amp;type=csv&quot;)
-    }
-    
-    ef_file &lt;- file.path(data_dir, glue(&quot;ef{yy}a.csv.zip&quot;))
-    
-    if(!file.exists(ef_file)){
-        message(glue(&quot;Downloading Enrollment Data for {yy} from {ef_url}&quot;))
-        download.file(ef_url, destfile = ef_file, quiet=TRUE, mode=&quot;wb&quot;)    
-    }
-    
-    read_csv(ef_file, 
-             show_col_types=FALSE) |&gt;
-        mutate(year = yy, 
-               # American Indian or Alaskan Native
-               enrollment_m_aian = EFAIANM, 
-               enrollment_f_aian = EFAIANW, 
-               # Asian
-               enrollment_m_asia = EFASIAM, 
-               enrollment_f_asia = EFASIAW, 
-               # Black or African-American, 
-               enrollment_m_bkaa = EFBKAAM, 
-               enrollment_f_bkaa = EFBKAAW, 
-               # Hispanic 
-               enrollment_m_hisp = EFHISPM, 
-               enrollment_f_hisp = EFHISPW, 
-               # Native Hawaiian or Other Pacific Islander 
-               enrollment_m_nhpi = EFNHPIM, 
-               enrollment_f_nhpi = EFNHPIW, 
-               # White
-               enrollment_m_whit = EFWHITM, 
-               enrollment_f_whit = EFWHITW, 
-               # Two or More Races
-               enrollment_m_2mor = EF2MORM, 
-               enrollment_f_2mor = EF2MORW, 
-               # Unknown / Undisclosed Race
-               enrollment_m_unkn = EFUNKNM, 
-               enrollment_f_unkn = EFUNKNW, 
-               # US Non-Resident
-               enrollment_m_nral = EFNRALM, 
-               enrollment_f_nral = EFNRALW, 
-        ) |&gt; filter(
-            (EFALEVEL %in% c(2, 12)) | (LINE %in% c(1, 15))
-            # Per 2024 Data Dictionary, 
-            # - EFALEVEL 2 = undergrad 
-            # - EFALELVE 12 = grad
-            # - Line 1 = first year first time full-time undergrad
-            # - Line 15 = first year first time part-time undergrad
-        ) |&gt; mutate(level = case_when(
-                   EFALEVEL == 2 ~ &quot;all undergrad&quot;, 
-                   EFALEVEL == 12 ~ &quot;all graduate&quot;,
-                   LINE %in% c(1, 15) ~ &quot;first year undergrad&quot;
-               )
-        ) |&gt;
-        select(institution_id = UNITID, 
-               year, 
-               level,
-               starts_with(&quot;enrollment_&quot;)) |&gt;
-        group_by(institution_id, 
-                 year, 
-                 level) |&gt;
-        summarize(across(starts_with(&quot;enrollment_&quot;), sum), 
-                  .groups = &quot;drop&quot;)
-    
-}) |&gt; bind_rows()
-
-DESC_ALL &lt;- map(YEARS, function(yy){
-    if(yy &lt;= 2022){
-        hd_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/datacenter/data/HD{yy}.zip&quot;)
-        
-    } else {
-        hd_url &lt;- glue(&quot;https://nces.ed.gov/ipeds/data-generator?year={yy}&amp;tableName=HD{yy}&amp;HasRV=0&amp;type=csv&quot;)
-    }
-    
-    hd_file &lt;- file.path(data_dir, glue(&quot;hd{yy}.csv.zip&quot;))
-    
-    if(!file.exists(hd_file)){
-        message(glue(&quot;Downloading Institutional Descriptions for {yy} from {hd_url}&quot;))
-        download.file(hd_url, destfile = hd_file, quiet=TRUE, mode=&quot;wb&quot;)    
-    }
-    
-    suppressWarnings(
-        read_csv(hd_file, 
-             show_col_types=FALSE, 
-             locale=locale(encoding=if_else(yy==2024, &quot;utf-8&quot;, &quot;windows-1252&quot;))) |&gt;
-        mutate(year = yy, 
-               INSTNM) |&gt; 
-        select(institution_id = UNITID, 
-               institution_name = INSTNM, 
-               state = STABBR, 
-               year)
-    )
-    
-}) |&gt; bind_rows()
-
-inner_join(EFA_ALL, 
-           DESC_ALL, 
-           join_by(institution_id == institution_id, 
-                   year == year))</code></pre>
-<p>}</p>
+IPEDS &lt;- acquire_ipeds_data()</code></pre>
+<pre><code>## Multiple files in zip: reading &#39;ef2010a.csv&#39;
+## Multiple files in zip: reading &#39;ef2011a.csv&#39;
+## Multiple files in zip: reading &#39;ef2012a.csv&#39;
+## Multiple files in zip: reading &#39;ef2013a.csv&#39;
+## Multiple files in zip: reading &#39;ef2014a.csv&#39;
+## Multiple files in zip: reading &#39;ef2015a.csv&#39;
+## Multiple files in zip: reading &#39;ef2016a.csv&#39;
+## Multiple files in zip: reading &#39;ef2017a.csv&#39;
+## Multiple files in zip: reading &#39;ef2018a.csv&#39;
+## Multiple files in zip: reading &#39;ef2019a.csv&#39;
+## Multiple files in zip: reading &#39;ef2020a.csv&#39;
+## Multiple files in zip: reading &#39;ef2021a.csv&#39;
+## Multiple files in zip: reading &#39;ef2022a.csv&#39;
+## New names:
+## Multiple files in zip: reading &#39;ef2023a.csv&#39;</code></pre>
+</div>
+<div id="task-2-identify-cuny-schools" class="section level2">
+<h2>Task 2: Identify CUNY Schools</h2>
 <pre class="r"><code>IPEDS &lt;- IPEDS |&gt;
-  mutate(is_cuny = str_detect(institution_name, &quot;CUNY&quot;))
+  mutate(
+    is_cuny = str_detect(institution_name, &quot;CUNY&quot;)
+  )</code></pre>
+</div>
+<div id="task-3-identify-uc-and-cal-state-schools" class="section level2">
+<h2>Task 3: Identify UC and Cal State Schools</h2>
+<pre class="r"><code>IPEDS &lt;- IPEDS |&gt;
+  mutate(
+    is_calpublic =
+      str_detect(institution_name, &quot;University of California&quot;) |
+      str_detect(institution_name, &quot;California State University&quot;)
+  )
+
+IPEDS |&gt;
+  filter(is_calpublic == TRUE) |&gt;
+  distinct(institution_name) |&gt;
+  arrange(institution_name)</code></pre>
+<pre><code>## # A tibble: 31 × 1
+##    institution_name                            
+##    &lt;chr&gt;                                       
+##  1 Bethesda University of California           
+##  2 California State University Maritime Academy
+##  3 California State University-Bakersfield     
+##  4 California State University-Channel Islands 
+##  5 California State University-Chico           
+##  6 California State University-Dominguez Hills 
+##  7 California State University-East Bay        
+##  8 California State University-Fresno          
+##  9 California State University-Fullerton       
+## 10 California State University-Long Beach      
+## # ℹ 21 more rows</code></pre>
+</div>
+<div id="task-4-initial-eda-pass" class="section level2">
+<h2>Task 4: Initial EDA Pass</h2>
+<p>Before beginning deeper analysis, it is helpful to inspect the
+dataset to understand its structure and verify that the variables were
+imported correctly.</p>
+<div id="inspecting-the-structure-of-the-dataset" class="section level3">
+<h3>Inspecting the structure of the dataset</h3>
+<pre class="r"><code>glimpse(IPEDS)</code></pre>
+<pre><code>## Rows: 219,316
+## Columns: 25
+## $ institution_id    &lt;dbl&gt; 100654, 100654, 100654, 100…
+## $ year              &lt;int&gt; 2010, 2010, 2010, 2010, 201…
+## $ level             &lt;chr&gt; &quot;all graduate&quot;, &quot;all underg…
+## $ enrollment_m_aian &lt;dbl&gt; 2, 2, 0, 5, 13, 0, 0, 0, 0,…
+## $ enrollment_f_aian &lt;dbl&gt; 0, 1, 0, 16, 22, 3, 0, 0, 0…
+## $ enrollment_m_asia &lt;dbl&gt; 4, 2, 0, 114, 210, 54, 0, 0…
+## $ enrollment_f_asia &lt;dbl&gt; 8, 7, 1, 191, 245, 55, 1, 3…
+## $ enrollment_m_bkaa &lt;dbl&gt; 199, 2250, 527, 182, 889, 1…
+## $ enrollment_f_bkaa &lt;dbl&gt; 430, 2498, 555, 669, 2016, …
+## $ enrollment_m_hisp &lt;dbl&gt; 0, 9, 3, 37, 79, 14, 4, 9, …
+## $ enrollment_f_hisp &lt;dbl&gt; 2, 7, 1, 82, 141, 14, 2, 3,…
+## $ enrollment_m_nhpi &lt;dbl&gt; 0, 0, 0, 0, 4, 1, 0, 0, 0, …
+## $ enrollment_f_nhpi &lt;dbl&gt; 0, 0, 0, 0, 4, 1, 0, 0, 0, …
+## $ enrollment_m_whit &lt;dbl&gt; 47, 59, 7, 1713, 3081, 455,…
+## $ enrollment_f_whit &lt;dbl&gt; 125, 42, 9, 2886, 3601, 490…
+## $ enrollment_m_2mor &lt;dbl&gt; 0, 0, 0, 16, 54, 18, 0, 0, …
+## $ enrollment_f_2mor &lt;dbl&gt; 0, 0, 0, 30, 75, 34, 0, 0, …
+## $ enrollment_m_unkn &lt;dbl&gt; 0, 10, 9, 64, 179, 5, 23, 4…
+## $ enrollment_f_unkn &lt;dbl&gt; 4, 10, 7, 92, 206, 7, 39, 6…
+## $ enrollment_m_nral &lt;dbl&gt; 37, 23, 2, 242, 99, 5, 0, 0…
+## $ enrollment_f_nral &lt;dbl&gt; 16, 20, 2, 176, 110, 8, 0, …
+## $ institution_name  &lt;chr&gt; &quot;Alabama A &amp; M University&quot;,…
+## $ state             &lt;chr&gt; &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL&quot;, &quot;AL…
+## $ is_cuny           &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE,…
+## $ is_calpublic      &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE,…</code></pre>
+</div>
+<div id="summary-statistics" class="section level3">
+<h3>Summary statistics</h3>
+<pre class="r"><code>summary(IPEDS)</code></pre>
+<pre><code>##  institution_id        year         level          
+##  Min.   :100654   Min.   :2010   Length:219316     
+##  1st Qu.:167039   1st Qu.:2013   Class :character  
+##  Median :216597   Median :2016   Mode  :character  
+##  Mean   :274222   Mean   :2017                     
+##  3rd Qu.:438586   3rd Qu.:2020                     
+##  Max.   :500555   Max.   :2024                     
+##  enrollment_m_aian  enrollment_f_aian 
+##  Min.   :   0.000   Min.   :   0.000  
+##  1st Qu.:   0.000   1st Qu.:   0.000  
+##  Median :   0.000   Median :   0.000  
+##  Mean   :   4.521   Mean   :   6.889  
+##  3rd Qu.:   2.000   3rd Qu.:   3.000  
+##  Max.   :1498.000   Max.   :1719.000  
+##  enrollment_m_asia enrollment_f_asia
+##  Min.   :   0.00   Min.   :   0.00  
+##  1st Qu.:   0.00   1st Qu.:   0.00  
+##  Median :   1.00   Median :   2.00  
+##  Mean   :  45.47   Mean   :  52.39  
+##  3rd Qu.:  11.00   3rd Qu.:  16.00  
+##  Max.   :6541.00   Max.   :6378.00  
+##  enrollment_m_bkaa  enrollment_f_bkaa
+##  Min.   :    0.00   Min.   :    0.0  
+##  1st Qu.:    1.00   1st Qu.:    2.0  
+##  Median :    9.00   Median :   15.0  
+##  Mean   :   75.73   Mean   :  128.6  
+##  3rd Qu.:   49.00   3rd Qu.:   71.0  
+##  Max.   :10401.00   Max.   :36035.0  
+##  enrollment_m_hisp enrollment_f_hisp
+##  Min.   :    0.0   Min.   :    0.0  
+##  1st Qu.:    1.0   1st Qu.:    2.0  
+##  Median :    7.0   Median :   14.0  
+##  Mean   :  120.3   Mean   :  170.7  
+##  3rd Qu.:   48.0   3rd Qu.:   74.0  
+##  Max.   :19464.0   Max.   :27342.0  
+##  enrollment_m_nhpi  enrollment_f_nhpi 
+##  Min.   :   0.000   Min.   :   0.000  
+##  1st Qu.:   0.000   1st Qu.:   0.000  
+##  Median :   0.000   Median :   0.000  
+##  Mean   :   2.112   Mean   :   2.721  
+##  3rd Qu.:   1.000   3rd Qu.:   1.000  
+##  Max.   :1354.000   Max.   :1556.000  
+##  enrollment_m_whit enrollment_f_whit enrollment_m_2mor
+##  Min.   :    0.0   Min.   :    0.0   Min.   :   0.00  
+##  1st Qu.:    2.0   1st Qu.:   10.0   1st Qu.:   0.00  
+##  Median :   33.0   Median :   59.0   Median :   1.00  
+##  Mean   :  351.7   Mean   :  450.9   Mean   :  21.76  
+##  3rd Qu.:  237.0   3rd Qu.:  314.0   3rd Qu.:  12.00  
+##  Max.   :34014.0   Max.   :74462.0   Max.   :5000.00  
+##  enrollment_f_2mor  enrollment_m_unkn 
+##  Min.   :    0.00   Min.   :    0.00  
+##  1st Qu.:    0.00   1st Qu.:    0.00  
+##  Median :    2.00   Median :    1.00  
+##  Mean   :   30.17   Mean   :   36.47  
+##  3rd Qu.:   17.00   3rd Qu.:   16.00  
+##  Max.   :12146.00   Max.   :25579.00  
+##  enrollment_f_unkn enrollment_m_nral enrollment_f_nral
+##  Min.   :    0     Min.   :   0.0    Min.   :   0.00  
+##  1st Qu.:    0     1st Qu.:   0.0    1st Qu.:   0.00  
+##  Median :    2     Median :   0.0    Median :   0.00  
+##  Mean   :   46     Mean   :  37.4    Mean   :  31.24  
+##  3rd Qu.:   22     3rd Qu.:   8.0    3rd Qu.:   7.00  
+##  Max.   :52081     Max.   :8181.0    Max.   :6339.00  
+##  institution_name      state            is_cuny       
+##  Length:219316      Length:219316      Mode :logical  
+##  Class :character   Class :character   FALSE:218606   
+##  Mode  :character   Mode  :character   TRUE :710      
+##                                                       
+##                                                       
+##                                                       
+##  is_calpublic   
+##  Mode :logical  
+##  FALSE:218126   
+##  TRUE :1190     
+##                 
+##                 
+## </code></pre>
+</div>
+<div id="observations" class="section level3">
+<h3>Observations</h3>
+<p>The <code>glimpse()</code> output shows the structure of the IPEDS
+dataset, including the number of rows and columns as well as the data
+type of each variable. The dataset contains information about
+institutions, enrollment counts, demographic categories, reporting year,
+and institutional characteristics such as whether a school belongs to
+the CUNY system or California public systems.</p>
+<p>The <code>summary()</code> output provides basic statistics for the
+variables in the dataset. Numeric variables such as enrollment counts
+show ranges of values across institutions and years, while categorical
+variables display the frequency of different categories. These checks
+confirm that the dataset has been loaded correctly and that the
+variables appear to be structured appropriately for further
+analysis.</p>
+</div>
+</div>
+<div id="task-5-exploratory-questions---inline-values" class="section level2">
+<h2>Task 5: Exploratory Questions - Inline Values</h2>
+<pre class="r"><code>library(scales)
 
 IPEDS &lt;- IPEDS |&gt;
   mutate(
-    is_uc  = str_detect(institution_name, &quot;University of California&quot;),
-    is_csu = str_detect(institution_name, &quot;California State&quot;),
-    is_calpublic = is_uc | is_csu
+    total_students =
+      enrollment_m_aian + enrollment_f_aian +
+      enrollment_m_asia + enrollment_f_asia +
+      enrollment_m_bkaa + enrollment_f_bkaa +
+      enrollment_m_hisp + enrollment_f_hisp +
+      enrollment_m_nhpi + enrollment_f_nhpi +
+      enrollment_m_whit + enrollment_f_whit +
+      enrollment_m_2mor + enrollment_f_2mor +
+      enrollment_m_unkn + enrollment_f_unkn +
+      enrollment_m_nral + enrollment_f_nral,
+    
+    female_students =
+      enrollment_f_aian + enrollment_f_asia + enrollment_f_bkaa +
+      enrollment_f_hisp + enrollment_f_nhpi + enrollment_f_whit +
+      enrollment_f_2mor + enrollment_f_unkn + enrollment_f_nral,
+    
+    nhpi_students =
+      enrollment_m_nhpi + enrollment_f_nhpi
   )</code></pre>
-<pre class="r"><code>IPEDS |&gt; 
-  select(institution_name, is_cuny, is_calpublic) |&gt;
-  slice_head(n = 10)</code></pre>
-<pre><code>## # A tibble: 8 × 3
-##   institution_name    is_cuny is_calpublic
-##   &lt;chr&gt;               &lt;lgl&gt;   &lt;lgl&gt;       
-## 1 CUNY Baruch College TRUE    FALSE       
-## 2 CUNY Baruch College TRUE    FALSE       
-## 3 CUNY Baruch College TRUE    FALSE       
-## 4 CUNY Baruch College TRUE    FALSE       
-## 5 Other University    FALSE   FALSE       
-## 6 Other University    FALSE   FALSE       
-## 7 Other University    FALSE   FALSE       
-## 8 Other University    FALSE   FALSE</code></pre>
-<pre class="r"><code>glimpse(IPEDS)</code></pre>
-<pre><code>## Rows: 8
-## Columns: 20
-## $ year               &lt;dbl&gt; 2021, 2022, 2023, 2024, 2…
-## $ institution_name   &lt;chr&gt; &quot;CUNY Baruch College&quot;, &quot;C…
-## $ enrollment_m_whit  &lt;dbl&gt; 1200, 1150, 1100, 1080, 5…
-## $ enrollment_f_whit  &lt;dbl&gt; 1300, 1250, 1200, 1180, 5…
-## $ enrollment_m_blck  &lt;dbl&gt; 400, 420, 430, 440, 800, …
-## $ enrollment_f_blck  &lt;dbl&gt; 500, 520, 540, 560, 900, …
-## $ enrollment_m_hisp  &lt;dbl&gt; 600, 640, 660, 680, 700, …
-## $ enrollment_f_hisp  &lt;dbl&gt; 700, 720, 740, 760, 850, …
-## $ enrollment_m_asian &lt;dbl&gt; 300, 310, 320, 330, 600, …
-## $ enrollment_f_asian &lt;dbl&gt; 350, 360, 370, 380, 650, …
-## $ enrollment_m_aian  &lt;dbl&gt; 20, 22, 24, 26, 40, 42, 4…
-## $ enrollment_f_aian  &lt;dbl&gt; 25, 26, 28, 30, 45, 47, 4…
-## $ enrollment_m_nhpi  &lt;dbl&gt; 10, 11, 12, 13, 20, 22, 2…
-## $ enrollment_f_nhpi  &lt;dbl&gt; 12, 13, 14, 15, 25, 27, 2…
-## $ enrollment_m_2mor  &lt;dbl&gt; 50, 55, 60, 65, 120, 130,…
-## $ enrollment_f_2mor  &lt;dbl&gt; 60, 65, 70, 75, 130, 140,…
-## $ is_cuny            &lt;lgl&gt; TRUE, TRUE, TRUE, TRUE, F…
-## $ is_uc              &lt;lgl&gt; FALSE, FALSE, FALSE, FALS…
-## $ is_csu             &lt;lgl&gt; FALSE, FALSE, FALSE, FALS…
-## $ is_calpublic       &lt;lgl&gt; FALSE, FALSE, FALSE, FALS…</code></pre>
-<pre class="r"><code>summary(IPEDS)</code></pre>
-<pre><code>##       year      institution_name   enrollment_m_whit
-##  Min.   :2021   Length:8           Min.   :1080     
-##  1st Qu.:2022   Class :character   1st Qu.:1138     
-##  Median :2023   Mode  :character   Median :2900     
-##  Mean   :2023                      Mean   :2966     
-##  3rd Qu.:2023                      3rd Qu.:4750     
-##  Max.   :2024                      Max.   :5000     
-##  enrollment_f_whit enrollment_m_blck
-##  Min.   :1180      Min.   :400.0    
-##  1st Qu.:1238      1st Qu.:427.5    
-##  Median :3050      Median :620.0    
-##  Mean   :3116      Mean   :623.8    
-##  3rd Qu.:4950      3rd Qu.:822.5    
-##  Max.   :5200      Max.   :850.0    
-##  enrollment_f_blck enrollment_m_hisp
-##  Min.   :500.0     Min.   :600.0    
-##  1st Qu.:535.0     1st Qu.:655.0    
-##  Median :730.0     Median :690.0    
-##  Mean   :737.5     Mean   :695.0    
-##  3rd Qu.:945.0     3rd Qu.:737.5    
-##  Max.   :980.0     Max.   :790.0    
-##  enrollment_f_hisp enrollment_m_asian
-##  Min.   :700.0     Min.   :300.0     
-##  1st Qu.:735.0     1st Qu.:317.5     
-##  Median :805.0     Median :465.0     
-##  Mean   :812.5     Mean   :472.5     
-##  3rd Qu.:887.5     3rd Qu.:625.0     
-##  Max.   :940.0     Max.   :660.0     
-##  enrollment_f_asian enrollment_m_aian
-##  Min.   :350.0      Min.   :20.0     
-##  1st Qu.:367.5      1st Qu.:23.5     
-##  Median :515.0      Median :33.0     
-##  Mean   :522.5      Mean   :33.0     
-##  3rd Qu.:675.0      3rd Qu.:42.5     
-##  Max.   :710.0      Max.   :46.0     
-##  enrollment_f_aian enrollment_m_nhpi
-##  Min.   :25.00     Min.   :10.00    
-##  1st Qu.:27.50     1st Qu.:11.75    
-##  Median :37.50     Median :16.50    
-##  Mean   :37.62     Mean   :17.25    
-##  3rd Qu.:47.50     3rd Qu.:22.50    
-##  Max.   :51.00     Max.   :26.00    
-##  enrollment_f_nhpi enrollment_m_2mor
-##  Min.   :12.00     Min.   : 50.00   
-##  1st Qu.:13.75     1st Qu.: 58.75   
-##  Median :20.00     Median : 92.50   
-##  Mean   :20.75     Mean   : 96.25   
-##  3rd Qu.:27.50     3rd Qu.:132.50   
-##  Max.   :31.00     Max.   :150.00   
-##  enrollment_f_2mor  is_cuny          is_uc        
-##  Min.   : 60.00    Mode :logical   Mode :logical  
-##  1st Qu.: 68.75    FALSE:4         FALSE:8        
-##  Median :102.50    TRUE :4                        
-##  Mean   :106.25                                   
-##  3rd Qu.:142.50                                   
-##  Max.   :160.00                                   
-##    is_csu        is_calpublic   
-##  Mode :logical   Mode :logical  
-##  FALSE:8         FALSE:8        
-##                                 
-##                                 
-##                                 
-## </code></pre>
-<pre class="r"><code>library(skimr)
-skim(IPEDS)</code></pre>
-<table>
-<caption>Data summary</caption>
-<tbody>
-<tr class="odd">
-<td align="left">Name</td>
-<td align="left">IPEDS</td>
-</tr>
-<tr class="even">
-<td align="left">Number of rows</td>
-<td align="left">8</td>
-</tr>
-<tr class="odd">
-<td align="left">Number of columns</td>
-<td align="left">20</td>
-</tr>
-<tr class="even">
-<td align="left">_______________________</td>
-<td align="left"></td>
-</tr>
-<tr class="odd">
-<td align="left">Column type frequency:</td>
-<td align="left"></td>
-</tr>
-<tr class="even">
-<td align="left">character</td>
-<td align="left">1</td>
-</tr>
-<tr class="odd">
-<td align="left">logical</td>
-<td align="left">4</td>
-</tr>
-<tr class="even">
-<td align="left">numeric</td>
-<td align="left">15</td>
-</tr>
-<tr class="odd">
-<td align="left">________________________</td>
-<td align="left"></td>
-</tr>
-<tr class="even">
-<td align="left">Group variables</td>
-<td align="left">None</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Variable type: character</strong></p>
-<table>
-<colgroup>
-<col width="22%" />
-<col width="13%" />
-<col width="18%" />
-<col width="5%" />
-<col width="5%" />
-<col width="8%" />
-<col width="12%" />
-<col width="14%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th align="left">skim_variable</th>
-<th align="right">n_missing</th>
-<th align="right">complete_rate</th>
-<th align="right">min</th>
-<th align="right">max</th>
-<th align="right">empty</th>
-<th align="right">n_unique</th>
-<th align="right">whitespace</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">institution_name</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">16</td>
-<td align="right">19</td>
-<td align="right">0</td>
-<td align="right">2</td>
-<td align="right">0</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Variable type: logical</strong></p>
-<table>
-<thead>
-<tr class="header">
-<th align="left">skim_variable</th>
-<th align="right">n_missing</th>
-<th align="right">complete_rate</th>
-<th align="right">mean</th>
-<th align="left">count</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">is_cuny</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">0.5</td>
-<td align="left">FAL: 4, TRU: 4</td>
-</tr>
-<tr class="even">
-<td align="left">is_uc</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">0.0</td>
-<td align="left">FAL: 8</td>
-</tr>
-<tr class="odd">
-<td align="left">is_csu</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">0.0</td>
-<td align="left">FAL: 8</td>
-</tr>
-<tr class="even">
-<td align="left">is_calpublic</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">0.0</td>
-<td align="left">FAL: 8</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Variable type: numeric</strong></p>
-<table style="width:100%;">
-<colgroup>
-<col width="19%" />
-<col width="10%" />
-<col width="14%" />
-<col width="8%" />
-<col width="8%" />
-<col width="5%" />
-<col width="8%" />
-<col width="7%" />
-<col width="8%" />
-<col width="5%" />
-<col width="6%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th align="left">skim_variable</th>
-<th align="right">n_missing</th>
-<th align="right">complete_rate</th>
-<th align="right">mean</th>
-<th align="right">sd</th>
-<th align="right">p0</th>
-<th align="right">p25</th>
-<th align="right">p50</th>
-<th align="right">p75</th>
-<th align="right">p100</th>
-<th align="left">hist</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="left">year</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">2022.50</td>
-<td align="right">1.20</td>
-<td align="right">2021</td>
-<td align="right">2021.75</td>
-<td align="right">2022.5</td>
-<td align="right">2023.25</td>
-<td align="right">2024</td>
-<td align="left">▇▇▁▇▇</td>
-</tr>
-<tr class="even">
-<td align="left">enrollment_m_whit</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">2966.25</td>
-<td align="right">1964.32</td>
-<td align="right">1080</td>
-<td align="right">1137.50</td>
-<td align="right">2900.0</td>
-<td align="right">4750.00</td>
-<td align="right">5000</td>
-<td align="left">▇▁▁▁▇</td>
-</tr>
-<tr class="odd">
-<td align="left">enrollment_f_whit</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">3116.25</td>
-<td align="right">2017.66</td>
-<td align="right">1180</td>
-<td align="right">1237.50</td>
-<td align="right">3050.0</td>
-<td align="right">4950.00</td>
-<td align="right">5200</td>
-<td align="left">▇▁▁▁▇</td>
-</tr>
-<tr class="even">
-<td align="left">enrollment_m_blck</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">623.75</td>
-<td align="right">215.87</td>
-<td align="right">400</td>
-<td align="right">427.50</td>
-<td align="right">620.0</td>
-<td align="right">822.50</td>
-<td align="right">850</td>
-<td align="left">▇▁▁▁▇</td>
-</tr>
-<tr class="odd">
-<td align="left">enrollment_f_blck</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">737.50</td>
-<td align="right">223.59</td>
-<td align="right">500</td>
-<td align="right">535.00</td>
-<td align="right">730.0</td>
-<td align="right">945.00</td>
-<td align="right">980</td>
-<td align="left">▇▁▁▁▇</td>
-</tr>
-<tr class="even">
-<td align="left">enrollment_m_hisp</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">695.00</td>
-<td align="right">63.25</td>
-<td align="right">600</td>
-<td align="right">655.00</td>
-<td align="right">690.0</td>
-<td align="right">737.50</td>
-<td align="right">790</td>
-<td align="left">▃▇▇▃▇</td>
-</tr>
-<tr class="odd">
-<td align="left">enrollment_f_hisp</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">812.50</td>
-<td align="right">93.31</td>
-<td align="right">700</td>
-<td align="right">735.00</td>
-<td align="right">805.0</td>
-<td align="right">887.50</td>
-<td align="right">940</td>
-<td align="left">▇▂▁▅▅</td>
-</tr>
-<tr class="even">
-<td align="left">enrollment_m_asian</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">472.50</td>
-<td align="right">169.43</td>
-<td align="right">300</td>
-<td align="right">317.50</td>
-<td align="right">465.0</td>
-<td align="right">625.00</td>
-<td align="right">660</td>
-<td align="left">▇▁▁▁▇</td>
-</tr>
-<tr class="odd">
-<td align="left">enrollment_f_asian</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">522.50</td>
-<td align="right">169.43</td>
-<td align="right">350</td>
-<td align="right">367.50</td>
-<td align="right">515.0</td>
-<td align="right">675.00</td>
-<td align="right">710</td>
-<td align="left">▇▁▁▁▇</td>
-</tr>
-<tr class="even">
-<td align="left">enrollment_m_aian</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">33.00</td>
-<td align="right">10.95</td>
-<td align="right">20</td>
-<td align="right">23.50</td>
-<td align="right">33.0</td>
-<td align="right">42.50</td>
-<td align="right">46</td>
-<td align="left">▇▂▁▂▇</td>
-</tr>
-<tr class="odd">
-<td align="left">enrollment_f_aian</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">37.62</td>
-<td align="right">11.31</td>
-<td align="right">25</td>
-<td align="right">27.50</td>
-<td align="right">37.5</td>
-<td align="right">47.50</td>
-<td align="right">51</td>
-<td align="left">▇▁▁▂▆</td>
-</tr>
-<tr class="even">
-<td align="left">enrollment_m_nhpi</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">17.25</td>
-<td align="right">6.43</td>
-<td align="right">10</td>
-<td align="right">11.75</td>
-<td align="right">16.5</td>
-<td align="right">22.50</td>
-<td align="right">26</td>
-<td align="left">▇▁▁▃▃</td>
-</tr>
-<tr class="odd">
-<td align="left">enrollment_f_nhpi</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">20.75</td>
-<td align="right">7.98</td>
-<td align="right">12</td>
-<td align="right">13.75</td>
-<td align="right">20.0</td>
-<td align="right">27.50</td>
-<td align="right">31</td>
-<td align="left">▇▁▁▃▃</td>
-</tr>
-<tr class="even">
-<td align="left">enrollment_m_2mor</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">96.25</td>
-<td align="right">42.49</td>
-<td align="right">50</td>
-<td align="right">58.75</td>
-<td align="right">92.5</td>
-<td align="right">132.50</td>
-<td align="right">150</td>
-<td align="left">▇▁▁▃▃</td>
-</tr>
-<tr class="odd">
-<td align="left">enrollment_f_2mor</td>
-<td align="right">0</td>
-<td align="right">1</td>
-<td align="right">106.25</td>
-<td align="right">42.49</td>
-<td align="right">60</td>
-<td align="right">68.75</td>
-<td align="right">102.5</td>
-<td align="right">142.50</td>
-<td align="right">160</td>
-<td align="left">▇▁▁▃▃</td>
-</tr>
-</tbody>
-</table>
-<div id="initial-eda-observations" class="section level2">
-<h2>Initial EDA Observations</h2>
-<p>The dataset contains information on institutions, enrollment counts,
-and demographics across multiple years. The data includes both
-undergraduate and graduate levels.</p>
-<p>Most columns are numeric enrollment counts, while institution names
-and states are character variables. The dataset appears complete with
-only minor missing values.</p>
-<p>The structure confirms that the data is ready for analysis.</p>
-</div>
-<div id="task-5-questions" class="section level2">
-<h2>Task 5 — Questions</h2>
-<p>There are 2 institutions in the dataset.</p>
-<p>The dataset covers years from 2021 to 2024.</p>
-<p>There are 4 CUNY institutions.</p>
-</div>
-<div id="task-6-tables" class="section level2">
-<h2>Task 6 — Tables</h2>
-<pre class="r"><code>library(gt)
-
-IPEDS |&gt;
-  mutate(total_students =
-           enrollment_m_whit + enrollment_f_whit +
-           enrollment_m_blck + enrollment_f_blck +
-           enrollment_m_hisp + enrollment_f_hisp +
-           enrollment_m_asian + enrollment_f_asian +
-           enrollment_m_aian + enrollment_f_aian +
-           enrollment_m_nhpi + enrollment_f_nhpi +
-           enrollment_m_2mor + enrollment_f_2mor) |&gt;
-  group_by(institution_name, year) |&gt;
-  summarise(total_students = sum(total_students), .groups=&quot;drop&quot;) |&gt;
-  arrange(institution_name, year) |&gt;
-  gt()</code></pre>
-<div id="kvhqqlzybn" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#kvhqqlzybn table {
+<p>There are 8,983 distinct institutions represented in this
+dataset.</p>
+<p>In 2024, Baruch College had 3,585 graduate students enrolled.</p>
+<p>In 2024, Baruch College had 20,081 total students enrolled.</p>
+<p>The institution with the highest number of female students in 2019
+was Western Governors University with 88,877 female students.</p>
+<p>Among institutions with over 1,000 total students, the institution
+with the highest proportion of Native Hawaiian or Pacific Islander
+first-year undergraduates in 2024 was University of Hawaii at Manoa with
+a proportion of 3.00%.</p>
+<p>## Task 6: Exploratory Questions - Table Answers</p>
+<div id="states-with-the-highest-graduate-enrollment" class="section level3">
+<h3>States with the Highest Graduate Enrollment</h3>
+<pre class="r"><code>IPEDS |&gt;
+  filter(level == &quot;all graduate&quot;) |&gt;
+  group_by(state) |&gt;
+  summarise(
+    graduate_students = sum(total_students, na.rm = TRUE),
+    .groups = &quot;drop&quot;
+  ) |&gt;
+  arrange(desc(graduate_students)) |&gt;
+  slice_head(n = 5) |&gt;
+  gt() |&gt;
+  cols_label(
+    state = &quot;State&quot;,
+    graduate_students = &quot;Graduate Students&quot;
+  ) |&gt;
+  fmt_number(columns = graduate_students, decimals = 0) |&gt;
+  tab_header(
+    title = &quot;Top 5 States by Graduate Enrollment&quot;,
+    subtitle = &quot;Total graduate students across all institutions&quot;
+  )</code></pre>
+<div id="cotpgymysx" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#cotpgymysx table {
 font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#kvhqqlzybn thead, #kvhqqlzybn tbody, #kvhqqlzybn tfoot, #kvhqqlzybn tr, #kvhqqlzybn td, #kvhqqlzybn th {
+#cotpgymysx thead, #cotpgymysx tbody, #cotpgymysx tfoot, #cotpgymysx tr, #cotpgymysx td, #cotpgymysx th {
 border-style: none;
 }
-#kvhqqlzybn p {
+#cotpgymysx p {
 margin: 0;
 padding: 0;
 }
-#kvhqqlzybn .gt_table {
+#cotpgymysx .gt_table {
 display: table;
 border-collapse: collapse;
 line-height: normal;
@@ -1052,11 +785,11 @@ border-left-style: none;
 border-left-width: 2px;
 border-left-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_caption {
+#cotpgymysx .gt_caption {
 padding-top: 4px;
 padding-bottom: 4px;
 }
-#kvhqqlzybn .gt_title {
+#cotpgymysx .gt_title {
 color: #333333;
 font-size: 125%;
 font-weight: initial;
@@ -1067,7 +800,7 @@ padding-right: 5px;
 border-bottom-color: #FFFFFF;
 border-bottom-width: 0;
 }
-#kvhqqlzybn .gt_subtitle {
+#cotpgymysx .gt_subtitle {
 color: #333333;
 font-size: 85%;
 font-weight: initial;
@@ -1078,7 +811,7 @@ padding-right: 5px;
 border-top-color: #FFFFFF;
 border-top-width: 0;
 }
-#kvhqqlzybn .gt_heading {
+#cotpgymysx .gt_heading {
 background-color: #FFFFFF;
 text-align: center;
 border-bottom-color: #FFFFFF;
@@ -1089,12 +822,12 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_bottom_border {
+#cotpgymysx .gt_bottom_border {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_col_headings {
+#cotpgymysx .gt_col_headings {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -1108,7 +841,7 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_col_heading {
+#cotpgymysx .gt_col_heading {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -1127,7 +860,7 @@ padding-left: 5px;
 padding-right: 5px;
 overflow-x: hidden;
 }
-#kvhqqlzybn .gt_column_spanner_outer {
+#cotpgymysx .gt_column_spanner_outer {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -1138,13 +871,13 @@ padding-bottom: 0;
 padding-left: 4px;
 padding-right: 4px;
 }
-#kvhqqlzybn .gt_column_spanner_outer:first-child {
+#cotpgymysx .gt_column_spanner_outer:first-child {
 padding-left: 0;
 }
-#kvhqqlzybn .gt_column_spanner_outer:last-child {
+#cotpgymysx .gt_column_spanner_outer:last-child {
 padding-right: 0;
 }
-#kvhqqlzybn .gt_column_spanner {
+#cotpgymysx .gt_column_spanner {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
@@ -1155,10 +888,10 @@ overflow-x: hidden;
 display: inline-block;
 width: 100%;
 }
-#kvhqqlzybn .gt_spanner_row {
+#cotpgymysx .gt_spanner_row {
 border-bottom-style: hidden;
 }
-#kvhqqlzybn .gt_group_heading {
+#cotpgymysx .gt_group_heading {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -1183,7 +916,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 text-align: left;
 }
-#kvhqqlzybn .gt_empty_group_heading {
+#cotpgymysx .gt_empty_group_heading {
 padding: 0.5px;
 color: #333333;
 background-color: #FFFFFF;
@@ -1197,13 +930,13 @@ border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 vertical-align: middle;
 }
-#kvhqqlzybn .gt_from_md > :first-child {
+#cotpgymysx .gt_from_md > :first-child {
 margin-top: 0;
 }
-#kvhqqlzybn .gt_from_md > :last-child {
+#cotpgymysx .gt_from_md > :last-child {
 margin-bottom: 0;
 }
-#kvhqqlzybn .gt_row {
+#cotpgymysx .gt_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -1221,7 +954,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 overflow-x: hidden;
 }
-#kvhqqlzybn .gt_stub {
+#cotpgymysx .gt_stub {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -1233,7 +966,7 @@ border-right-color: #D3D3D3;
 padding-left: 5px;
 padding-right: 5px;
 }
-#kvhqqlzybn .gt_stub_row_group {
+#cotpgymysx .gt_stub_row_group {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -1246,13 +979,13 @@ padding-left: 5px;
 padding-right: 5px;
 vertical-align: top;
 }
-#kvhqqlzybn .gt_row_group_first td {
+#cotpgymysx .gt_row_group_first td {
 border-top-width: 2px;
 }
-#kvhqqlzybn .gt_row_group_first th {
+#cotpgymysx .gt_row_group_first th {
 border-top-width: 2px;
 }
-#kvhqqlzybn .gt_summary_row {
+#cotpgymysx .gt_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -1261,14 +994,14 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#kvhqqlzybn .gt_first_summary_row {
+#cotpgymysx .gt_first_summary_row {
 border-top-style: solid;
 border-top-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_first_summary_row.thick {
+#cotpgymysx .gt_first_summary_row.thick {
 border-top-width: 2px;
 }
-#kvhqqlzybn .gt_last_summary_row {
+#cotpgymysx .gt_last_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -1277,7 +1010,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_grand_summary_row {
+#cotpgymysx .gt_grand_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -1286,7 +1019,7 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#kvhqqlzybn .gt_first_grand_summary_row {
+#cotpgymysx .gt_first_grand_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -1295,7 +1028,7 @@ border-top-style: double;
 border-top-width: 6px;
 border-top-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_last_grand_summary_row_top {
+#cotpgymysx .gt_last_grand_summary_row_top {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -1304,10 +1037,10 @@ border-bottom-style: double;
 border-bottom-width: 6px;
 border-bottom-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_striped {
+#cotpgymysx .gt_striped {
 background-color: rgba(128, 128, 128, 0.05);
 }
-#kvhqqlzybn .gt_table_body {
+#cotpgymysx .gt_table_body {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -1315,7 +1048,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_footnotes {
+#cotpgymysx .gt_footnotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -1328,7 +1061,7 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_footnote {
+#cotpgymysx .gt_footnote {
 margin: 0px;
 font-size: 90%;
 padding-top: 4px;
@@ -1336,7 +1069,7 @@ padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#kvhqqlzybn .gt_sourcenotes {
+#cotpgymysx .gt_sourcenotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -1349,112 +1082,2131 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#kvhqqlzybn .gt_sourcenote {
+#cotpgymysx .gt_sourcenote {
 font-size: 90%;
 padding-top: 4px;
 padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#kvhqqlzybn .gt_left {
+#cotpgymysx .gt_left {
 text-align: left;
 }
-#kvhqqlzybn .gt_center {
+#cotpgymysx .gt_center {
 text-align: center;
 }
-#kvhqqlzybn .gt_right {
+#cotpgymysx .gt_right {
 text-align: right;
 font-variant-numeric: tabular-nums;
 }
-#kvhqqlzybn .gt_font_normal {
+#cotpgymysx .gt_font_normal {
 font-weight: normal;
 }
-#kvhqqlzybn .gt_font_bold {
+#cotpgymysx .gt_font_bold {
 font-weight: bold;
 }
-#kvhqqlzybn .gt_font_italic {
+#cotpgymysx .gt_font_italic {
 font-style: italic;
 }
-#kvhqqlzybn .gt_super {
+#cotpgymysx .gt_super {
 font-size: 65%;
 }
-#kvhqqlzybn .gt_footnote_marks {
+#cotpgymysx .gt_footnote_marks {
 font-size: 75%;
 vertical-align: 0.4em;
 position: initial;
 }
-#kvhqqlzybn .gt_asterisk {
+#cotpgymysx .gt_asterisk {
 font-size: 100%;
 vertical-align: 0;
 }
-#kvhqqlzybn .gt_indent_1 {
+#cotpgymysx .gt_indent_1 {
 text-indent: 5px;
 }
-#kvhqqlzybn .gt_indent_2 {
+#cotpgymysx .gt_indent_2 {
 text-indent: 10px;
 }
-#kvhqqlzybn .gt_indent_3 {
+#cotpgymysx .gt_indent_3 {
 text-indent: 15px;
 }
-#kvhqqlzybn .gt_indent_4 {
+#cotpgymysx .gt_indent_4 {
 text-indent: 20px;
 }
-#kvhqqlzybn .gt_indent_5 {
+#cotpgymysx .gt_indent_5 {
 text-indent: 25px;
 }
-#kvhqqlzybn .katex-display {
+#cotpgymysx .katex-display {
 display: inline-flex !important;
 margin-bottom: 0.75em !important;
 }
-#kvhqqlzybn div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#cotpgymysx div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
 height: 0px !important;
 }
 </style>
 <table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
   <thead>
+    <tr class="gt_heading">
+      <td colspan="2" class="gt_heading gt_title gt_font_normal" style>Top 5 States by Graduate Enrollment</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="2" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Total graduate students across all institutions</td>
+    </tr>
     <tr class="gt_col_headings">
-      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="institution_name">institution_name</th>
-      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="year">year</th>
-      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="total_students">total_students</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="state">State</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="graduate_students">Graduate Students</th>
     </tr>
   </thead>
   <tbody class="gt_table_body">
-    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Baruch College</td>
-<td headers="year" class="gt_row gt_right">2021</td>
-<td headers="total_students" class="gt_row gt_right">5527</td></tr>
-    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Baruch College</td>
-<td headers="year" class="gt_row gt_right">2022</td>
-<td headers="total_students" class="gt_row gt_right">5562</td></tr>
-    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Baruch College</td>
-<td headers="year" class="gt_row gt_right">2023</td>
-<td headers="total_students" class="gt_row gt_right">5568</td></tr>
-    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Baruch College</td>
-<td headers="year" class="gt_row gt_right">2024</td>
-<td headers="total_students" class="gt_row gt_right">5634</td></tr>
-    <tr><td headers="institution_name" class="gt_row gt_left">Other University</td>
-<td headers="year" class="gt_row gt_right">2021</td>
-<td headers="total_students" class="gt_row gt_right">15080</td></tr>
-    <tr><td headers="institution_name" class="gt_row gt_left">Other University</td>
-<td headers="year" class="gt_row gt_right">2022</td>
-<td headers="total_students" class="gt_row gt_right">15068</td></tr>
-    <tr><td headers="institution_name" class="gt_row gt_left">Other University</td>
-<td headers="year" class="gt_row gt_right">2023</td>
-<td headers="total_students" class="gt_row gt_right">14826</td></tr>
-    <tr><td headers="institution_name" class="gt_row gt_left">Other University</td>
-<td headers="year" class="gt_row gt_right">2024</td>
-<td headers="total_students" class="gt_row gt_right">14794</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">CA</td>
+<td headers="graduate_students" class="gt_row gt_right">4,475,614</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">NY</td>
+<td headers="graduate_students" class="gt_row gt_right">3,667,601</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">TX</td>
+<td headers="graduate_students" class="gt_row gt_right">2,911,827</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">IL</td>
+<td headers="graduate_students" class="gt_row gt_right">2,329,612</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">PA</td>
+<td headers="graduate_students" class="gt_row gt_right">2,135,193</td></tr>
   </tbody>
   
 </table>
+</div>
+<p>This table shows the five states with the highest total graduate
+student enrollment across institutions.</p>
+</div>
+<div id="first-year-undergraduate-enrollment-at-cuny-in-2024" class="section level3">
+<h3>First-Year Undergraduate Enrollment at CUNY in 2024</h3>
+<pre class="r"><code>IPEDS |&gt;
+  filter(
+    is_cuny == TRUE,
+    year == 2024,
+    level == &quot;first year undergrad&quot;
+  ) |&gt;
+  mutate(
+    pct_total = total_students / sum(total_students, na.rm = TRUE)
+  ) |&gt;
+  select(
+    institution_name,
+    total_students,
+    pct_total
+  ) |&gt;
+  arrange(desc(total_students)) |&gt;
+  gt() |&gt;
+  cols_label(
+    institution_name = &quot;Institution&quot;,
+    total_students = &quot;First-Year Undergraduates&quot;,
+    pct_total = &quot;Percent of CUNY Total&quot;
+  ) |&gt;
+  fmt_number(columns = total_students, decimals = 0) |&gt;
+  fmt_percent(columns = pct_total, decimals = 2) |&gt;
+  tab_header(
+    title = &quot;CUNY First-Year Undergraduate Enrollment in 2024&quot;,
+    subtitle = &quot;Institutional counts and share of the CUNY total&quot;
+  )</code></pre>
+<div id="coisjbdfol" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#coisjbdfol table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#coisjbdfol thead, #coisjbdfol tbody, #coisjbdfol tfoot, #coisjbdfol tr, #coisjbdfol td, #coisjbdfol th {
+border-style: none;
+}
+#coisjbdfol p {
+margin: 0;
+padding: 0;
+}
+#coisjbdfol .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#coisjbdfol .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#coisjbdfol .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#coisjbdfol .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#coisjbdfol .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#coisjbdfol .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#coisjbdfol .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#coisjbdfol .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#coisjbdfol .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#coisjbdfol .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#coisjbdfol .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#coisjbdfol .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#coisjbdfol .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#coisjbdfol .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#coisjbdfol .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#coisjbdfol .gt_from_md > :first-child {
+margin-top: 0;
+}
+#coisjbdfol .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#coisjbdfol .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#coisjbdfol .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#coisjbdfol .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#coisjbdfol .gt_row_group_first td {
+border-top-width: 2px;
+}
+#coisjbdfol .gt_row_group_first th {
+border-top-width: 2px;
+}
+#coisjbdfol .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#coisjbdfol .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#coisjbdfol .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#coisjbdfol .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#coisjbdfol .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#coisjbdfol .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#coisjbdfol .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#coisjbdfol .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#coisjbdfol .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#coisjbdfol .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#coisjbdfol .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#coisjbdfol .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#coisjbdfol .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#coisjbdfol .gt_left {
+text-align: left;
+}
+#coisjbdfol .gt_center {
+text-align: center;
+}
+#coisjbdfol .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#coisjbdfol .gt_font_normal {
+font-weight: normal;
+}
+#coisjbdfol .gt_font_bold {
+font-weight: bold;
+}
+#coisjbdfol .gt_font_italic {
+font-style: italic;
+}
+#coisjbdfol .gt_super {
+font-size: 65%;
+}
+#coisjbdfol .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#coisjbdfol .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#coisjbdfol .gt_indent_1 {
+text-indent: 5px;
+}
+#coisjbdfol .gt_indent_2 {
+text-indent: 10px;
+}
+#coisjbdfol .gt_indent_3 {
+text-indent: 15px;
+}
+#coisjbdfol .gt_indent_4 {
+text-indent: 20px;
+}
+#coisjbdfol .gt_indent_5 {
+text-indent: 25px;
+}
+#coisjbdfol .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#coisjbdfol div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_title gt_font_normal" style>CUNY First-Year Undergraduate Enrollment in 2024</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Institutional counts and share of the CUNY total</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="institution_name">Institution</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="total_students">First-Year Undergraduates</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="pct_total">Percent of CUNY Total</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Borough of Manhattan Community College</td>
+<td headers="total_students" class="gt_row gt_right">4,718</td>
+<td headers="pct_total" class="gt_row gt_right">13.29%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY New York City College of Technology</td>
+<td headers="total_students" class="gt_row gt_right">3,585</td>
+<td headers="pct_total" class="gt_row gt_right">10.10%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Hunter College</td>
+<td headers="total_students" class="gt_row gt_right">2,897</td>
+<td headers="pct_total" class="gt_row gt_right">8.16%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY City College</td>
+<td headers="total_students" class="gt_row gt_right">2,543</td>
+<td headers="pct_total" class="gt_row gt_right">7.17%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Bernard M Baruch College</td>
+<td headers="total_students" class="gt_row gt_right">2,532</td>
+<td headers="pct_total" class="gt_row gt_right">7.13%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY LaGuardia Community College</td>
+<td headers="total_students" class="gt_row gt_right">2,406</td>
+<td headers="pct_total" class="gt_row gt_right">6.78%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">College of Staten Island CUNY</td>
+<td headers="total_students" class="gt_row gt_right">2,196</td>
+<td headers="pct_total" class="gt_row gt_right">6.19%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY John Jay College of Criminal Justice</td>
+<td headers="total_students" class="gt_row gt_right">2,128</td>
+<td headers="pct_total" class="gt_row gt_right">6.00%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Queensborough Community College</td>
+<td headers="total_students" class="gt_row gt_right">1,965</td>
+<td headers="pct_total" class="gt_row gt_right">5.54%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Brooklyn College</td>
+<td headers="total_students" class="gt_row gt_right">1,782</td>
+<td headers="pct_total" class="gt_row gt_right">5.02%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Queens College</td>
+<td headers="total_students" class="gt_row gt_right">1,751</td>
+<td headers="pct_total" class="gt_row gt_right">4.93%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Kingsborough Community College</td>
+<td headers="total_students" class="gt_row gt_right">1,615</td>
+<td headers="pct_total" class="gt_row gt_right">4.55%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Lehman College</td>
+<td headers="total_students" class="gt_row gt_right">1,545</td>
+<td headers="pct_total" class="gt_row gt_right">4.35%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Bronx Community College</td>
+<td headers="total_students" class="gt_row gt_right">1,252</td>
+<td headers="pct_total" class="gt_row gt_right">3.53%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Hostos Community College</td>
+<td headers="total_students" class="gt_row gt_right">844</td>
+<td headers="pct_total" class="gt_row gt_right">2.38%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY York College</td>
+<td headers="total_students" class="gt_row gt_right">766</td>
+<td headers="pct_total" class="gt_row gt_right">2.16%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Medgar Evers College</td>
+<td headers="total_students" class="gt_row gt_right">586</td>
+<td headers="pct_total" class="gt_row gt_right">1.65%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Stella and Charles Guttman Community College</td>
+<td headers="total_students" class="gt_row gt_right">367</td>
+<td headers="pct_total" class="gt_row gt_right">1.03%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">CUNY Graduate School and University Center</td>
+<td headers="total_students" class="gt_row gt_right">12</td>
+<td headers="pct_total" class="gt_row gt_right">0.03%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table shows the number of first-year undergraduate students
+enrolled at each CUNY institution in 2024 and each college’s share of
+the total.</p>
+</div>
+<div id="baruch-undergraduate-enrollment-over-time" class="section level3">
+<h3>Baruch Undergraduate Enrollment Over Time</h3>
+<pre class="r"><code>IPEDS |&gt;
+  filter(
+    str_detect(institution_name, &quot;Baruch&quot;),
+    level == &quot;all undergrad&quot;
+  ) |&gt;
+  arrange(year) |&gt;
+  mutate(
+    pct_change = (total_students - lag(total_students)) / lag(total_students)
+  ) |&gt;
+  select(
+    year,
+    total_students,
+    pct_change
+  ) |&gt;
+  gt() |&gt;
+  cols_label(
+    year = &quot;Year&quot;,
+    total_students = &quot;Undergraduate Enrollment&quot;,
+    pct_change = &quot;Year-over-Year Change&quot;
+  ) |&gt;
+  fmt_number(columns = total_students, decimals = 0) |&gt;
+  fmt_percent(columns = pct_change, decimals = 2) |&gt;
+  tab_header(
+    title = &quot;Baruch Undergraduate Enrollment Over Time&quot;,
+    subtitle = &quot;Total undergraduate students and year-over-year percent change&quot;
+  )</code></pre>
+<div id="zyqipbsffl" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#zyqipbsffl table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#zyqipbsffl thead, #zyqipbsffl tbody, #zyqipbsffl tfoot, #zyqipbsffl tr, #zyqipbsffl td, #zyqipbsffl th {
+border-style: none;
+}
+#zyqipbsffl p {
+margin: 0;
+padding: 0;
+}
+#zyqipbsffl .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#zyqipbsffl .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#zyqipbsffl .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#zyqipbsffl .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#zyqipbsffl .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#zyqipbsffl .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#zyqipbsffl .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#zyqipbsffl .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#zyqipbsffl .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#zyqipbsffl .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#zyqipbsffl .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#zyqipbsffl .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#zyqipbsffl .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#zyqipbsffl .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#zyqipbsffl .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#zyqipbsffl .gt_from_md > :first-child {
+margin-top: 0;
+}
+#zyqipbsffl .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#zyqipbsffl .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#zyqipbsffl .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#zyqipbsffl .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#zyqipbsffl .gt_row_group_first td {
+border-top-width: 2px;
+}
+#zyqipbsffl .gt_row_group_first th {
+border-top-width: 2px;
+}
+#zyqipbsffl .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#zyqipbsffl .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#zyqipbsffl .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#zyqipbsffl .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#zyqipbsffl .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#zyqipbsffl .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#zyqipbsffl .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#zyqipbsffl .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#zyqipbsffl .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#zyqipbsffl .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#zyqipbsffl .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#zyqipbsffl .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#zyqipbsffl .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#zyqipbsffl .gt_left {
+text-align: left;
+}
+#zyqipbsffl .gt_center {
+text-align: center;
+}
+#zyqipbsffl .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#zyqipbsffl .gt_font_normal {
+font-weight: normal;
+}
+#zyqipbsffl .gt_font_bold {
+font-weight: bold;
+}
+#zyqipbsffl .gt_font_italic {
+font-style: italic;
+}
+#zyqipbsffl .gt_super {
+font-size: 65%;
+}
+#zyqipbsffl .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#zyqipbsffl .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#zyqipbsffl .gt_indent_1 {
+text-indent: 5px;
+}
+#zyqipbsffl .gt_indent_2 {
+text-indent: 10px;
+}
+#zyqipbsffl .gt_indent_3 {
+text-indent: 15px;
+}
+#zyqipbsffl .gt_indent_4 {
+text-indent: 20px;
+}
+#zyqipbsffl .gt_indent_5 {
+text-indent: 25px;
+}
+#zyqipbsffl .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#zyqipbsffl div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_title gt_font_normal" style>Baruch Undergraduate Enrollment Over Time</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="3" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Total undergraduate students and year-over-year percent change</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="year">Year</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="total_students">Undergraduate Enrollment</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="pct_change">Year-over-Year Change</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="year" class="gt_row gt_right">2010</td>
+<td headers="total_students" class="gt_row gt_right">13,120</td>
+<td headers="pct_change" class="gt_row gt_right">NA</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2011</td>
+<td headers="total_students" class="gt_row gt_right">14,266</td>
+<td headers="pct_change" class="gt_row gt_right">8.73%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2012</td>
+<td headers="total_students" class="gt_row gt_right">13,777</td>
+<td headers="pct_change" class="gt_row gt_right">−3.43%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2013</td>
+<td headers="total_students" class="gt_row gt_right">14,082</td>
+<td headers="pct_change" class="gt_row gt_right">2.21%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2014</td>
+<td headers="total_students" class="gt_row gt_right">14,857</td>
+<td headers="pct_change" class="gt_row gt_right">5.50%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2015</td>
+<td headers="total_students" class="gt_row gt_right">15,254</td>
+<td headers="pct_change" class="gt_row gt_right">2.67%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2016</td>
+<td headers="total_students" class="gt_row gt_right">15,210</td>
+<td headers="pct_change" class="gt_row gt_right">−0.29%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2017</td>
+<td headers="total_students" class="gt_row gt_right">15,253</td>
+<td headers="pct_change" class="gt_row gt_right">0.28%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2018</td>
+<td headers="total_students" class="gt_row gt_right">15,024</td>
+<td headers="pct_change" class="gt_row gt_right">−1.50%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2019</td>
+<td headers="total_students" class="gt_row gt_right">15,482</td>
+<td headers="pct_change" class="gt_row gt_right">3.05%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2020</td>
+<td headers="total_students" class="gt_row gt_right">15,774</td>
+<td headers="pct_change" class="gt_row gt_right">1.89%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2021</td>
+<td headers="total_students" class="gt_row gt_right">15,859</td>
+<td headers="pct_change" class="gt_row gt_right">0.54%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2022</td>
+<td headers="total_students" class="gt_row gt_right">15,896</td>
+<td headers="pct_change" class="gt_row gt_right">0.23%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2023</td>
+<td headers="total_students" class="gt_row gt_right">16,086</td>
+<td headers="pct_change" class="gt_row gt_right">1.20%</td></tr>
+    <tr><td headers="year" class="gt_row gt_right">2024</td>
+<td headers="total_students" class="gt_row gt_right">16,496</td>
+<td headers="pct_change" class="gt_row gt_right">2.55%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table summarizes Baruch College’s undergraduate enrollment over
+the study period and shows the year-over-year percentage change.</p>
+</div>
+<div id="institutions-with-the-largest-decline-in-white-student-share-2010-to-2020" class="section level3">
+<h3>Institutions with the Largest Decline in White Student Share, 2010
+to 2020</h3>
+<pre class="r"><code>white_decline &lt;- IPEDS |&gt;
+  filter(
+    level == &quot;all undergrad&quot;,
+    year %in% c(2010, 2020)
+  ) |&gt;
+  group_by(institution_name, year) |&gt;
+  summarise(
+    total_students = sum(total_students, na.rm = TRUE),
+    white_students = sum(enrollment_m_whit + enrollment_f_whit, na.rm = TRUE),
+    .groups = &quot;drop&quot;
+  ) |&gt;
+  filter(total_students &gt; 1000) |&gt;
+  mutate(white_share = white_students / total_students) |&gt;
+  select(institution_name, year, white_share) |&gt;
+  pivot_wider(names_from = year, values_from = white_share) |&gt;
+  mutate(change = `2020` - `2010`) |&gt;
+  arrange(change) |&gt;
+  slice_head(n = 5)
 
-<details class="callout-note">
-<summary><strong>AI Usage Statement</strong></summary>
+white_decline |&gt;
+  gt() |&gt;
+  cols_label(
+    institution_name = &quot;Institution&quot;,
+    `2010` = &quot;White Share (2010)&quot;,
+    `2020` = &quot;White Share (2020)&quot;,
+    change = &quot;Change&quot;
+  ) |&gt;
+  fmt_percent(columns = c(`2010`, `2020`, change), decimals = 2) |&gt;
+  tab_header(
+    title = &quot;Largest Declines in White Undergraduate Share&quot;,
+    subtitle = &quot;Top 5 institutions, 2010 to 2020&quot;
+  )</code></pre>
+<div id="qprrrzjjfx" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#qprrrzjjfx table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#qprrrzjjfx thead, #qprrrzjjfx tbody, #qprrrzjjfx tfoot, #qprrrzjjfx tr, #qprrrzjjfx td, #qprrrzjjfx th {
+border-style: none;
+}
+#qprrrzjjfx p {
+margin: 0;
+padding: 0;
+}
+#qprrrzjjfx .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#qprrrzjjfx .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#qprrrzjjfx .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#qprrrzjjfx .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#qprrrzjjfx .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#qprrrzjjfx .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#qprrrzjjfx .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#qprrrzjjfx .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#qprrrzjjfx .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#qprrrzjjfx .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#qprrrzjjfx .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#qprrrzjjfx .gt_from_md > :first-child {
+margin-top: 0;
+}
+#qprrrzjjfx .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#qprrrzjjfx .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#qprrrzjjfx .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#qprrrzjjfx .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#qprrrzjjfx .gt_row_group_first td {
+border-top-width: 2px;
+}
+#qprrrzjjfx .gt_row_group_first th {
+border-top-width: 2px;
+}
+#qprrrzjjfx .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#qprrrzjjfx .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#qprrrzjjfx .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#qprrrzjjfx .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#qprrrzjjfx .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#qprrrzjjfx .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#qprrrzjjfx .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#qprrrzjjfx .gt_left {
+text-align: left;
+}
+#qprrrzjjfx .gt_center {
+text-align: center;
+}
+#qprrrzjjfx .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#qprrrzjjfx .gt_font_normal {
+font-weight: normal;
+}
+#qprrrzjjfx .gt_font_bold {
+font-weight: bold;
+}
+#qprrrzjjfx .gt_font_italic {
+font-style: italic;
+}
+#qprrrzjjfx .gt_super {
+font-size: 65%;
+}
+#qprrrzjjfx .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#qprrrzjjfx .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#qprrrzjjfx .gt_indent_1 {
+text-indent: 5px;
+}
+#qprrrzjjfx .gt_indent_2 {
+text-indent: 10px;
+}
+#qprrrzjjfx .gt_indent_3 {
+text-indent: 15px;
+}
+#qprrrzjjfx .gt_indent_4 {
+text-indent: 20px;
+}
+#qprrrzjjfx .gt_indent_5 {
+text-indent: 25px;
+}
+#qprrrzjjfx .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#qprrrzjjfx div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_title gt_font_normal" style>Largest Declines in White Undergraduate Share</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Top 5 institutions, 2010 to 2020</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="institution_name">Institution</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2010">White Share (2010)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2020">White Share (2020)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="change">Change</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="institution_name" class="gt_row gt_left">University of the Cumberlands</td>
+<td headers="2010" class="gt_row gt_right">82.25%</td>
+<td headers="2020" class="gt_row gt_right">12.41%</td>
+<td headers="change" class="gt_row gt_right">−69.83%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">New England Institute of Technology</td>
+<td headers="2010" class="gt_row gt_right">66.97%</td>
+<td headers="2020" class="gt_row gt_right">7.92%</td>
+<td headers="change" class="gt_row gt_right">−59.05%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">Saint Joseph&#39;s College of Maine</td>
+<td headers="2010" class="gt_row gt_right">70.73%</td>
+<td headers="2020" class="gt_row gt_right">19.71%</td>
+<td headers="change" class="gt_row gt_right">−51.02%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">Montcalm Community College</td>
+<td headers="2010" class="gt_row gt_right">89.47%</td>
+<td headers="2020" class="gt_row gt_right">46.46%</td>
+<td headers="change" class="gt_row gt_right">−43.00%</td></tr>
+    <tr><td headers="institution_name" class="gt_row gt_left">Walsh University</td>
+<td headers="2010" class="gt_row gt_right">81.22%</td>
+<td headers="2020" class="gt_row gt_right">42.16%</td>
+<td headers="change" class="gt_row gt_right">−39.06%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table identifies the five institutions where the fraction of
+white undergraduate students declined the most from 2010 to 2020.</p>
+</div>
+<div id="states-with-the-largest-increase-in-female-undergraduate-share-2010-to-2024" class="section level3">
+<h3>States with the Largest Increase in Female Undergraduate Share, 2010
+to 2024</h3>
+<pre class="r"><code>female_increase &lt;- IPEDS |&gt;
+  filter(
+    level == &quot;all undergrad&quot;,
+    year %in% c(2010, 2024)
+  ) |&gt;
+  group_by(state, year) |&gt;
+  summarise(
+    total_students = sum(total_students, na.rm = TRUE),
+    female_students = sum(
+      enrollment_f_aian + enrollment_f_asia + enrollment_f_bkaa +
+      enrollment_f_hisp + enrollment_f_nhpi + enrollment_f_whit +
+      enrollment_f_2mor + enrollment_f_unkn + enrollment_f_nral,
+      na.rm = TRUE
+    ),
+    .groups = &quot;drop&quot;
+  ) |&gt;
+  mutate(female_share = female_students / total_students) |&gt;
+  select(state, year, female_share) |&gt;
+  pivot_wider(names_from = year, values_from = female_share) |&gt;
+  mutate(change = `2024` - `2010`) |&gt;
+  arrange(desc(change)) |&gt;
+  slice_head(n = 3)
 
-<p>Generative AI tools (ChatGPT) were used to help troubleshoot coding
-errors and understand R/Quarto workflow steps. All analysis and code execution were completed and
-verified by Izabelle Diaz.</p>
+female_increase |&gt;
+  gt() |&gt;
+  cols_label(
+    state = &quot;State&quot;,
+    `2010` = &quot;Female Share (2010)&quot;,
+    `2024` = &quot;Female Share (2024)&quot;,
+    change = &quot;Change&quot;
+  ) |&gt;
+  fmt_percent(columns = c(`2010`, `2024`, change), decimals = 2) |&gt;
+  tab_header(
+    title = &quot;Largest Increases in Female Undergraduate Share&quot;,
+    subtitle = &quot;Top 3 states, 2010 to 2024&quot;
+  )</code></pre>
+<div id="ierobfiumr" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#ierobfiumr table {
+font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+#ierobfiumr thead, #ierobfiumr tbody, #ierobfiumr tfoot, #ierobfiumr tr, #ierobfiumr td, #ierobfiumr th {
+border-style: none;
+}
+#ierobfiumr p {
+margin: 0;
+padding: 0;
+}
+#ierobfiumr .gt_table {
+display: table;
+border-collapse: collapse;
+line-height: normal;
+margin-left: auto;
+margin-right: auto;
+color: #333333;
+font-size: 16px;
+font-weight: normal;
+font-style: normal;
+background-color: #FFFFFF;
+width: auto;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #A8A8A8;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #A8A8A8;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+}
+#ierobfiumr .gt_caption {
+padding-top: 4px;
+padding-bottom: 4px;
+}
+#ierobfiumr .gt_title {
+color: #333333;
+font-size: 125%;
+font-weight: initial;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-color: #FFFFFF;
+border-bottom-width: 0;
+}
+#ierobfiumr .gt_subtitle {
+color: #333333;
+font-size: 85%;
+font-weight: initial;
+padding-top: 3px;
+padding-bottom: 5px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-color: #FFFFFF;
+border-top-width: 0;
+}
+#ierobfiumr .gt_heading {
+background-color: #FFFFFF;
+text-align: center;
+border-bottom-color: #FFFFFF;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#ierobfiumr .gt_bottom_border {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ierobfiumr .gt_col_headings {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+}
+#ierobfiumr .gt_col_heading {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 6px;
+padding-left: 5px;
+padding-right: 5px;
+overflow-x: hidden;
+}
+#ierobfiumr .gt_column_spanner_outer {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: normal;
+text-transform: inherit;
+padding-top: 0;
+padding-bottom: 0;
+padding-left: 4px;
+padding-right: 4px;
+}
+#ierobfiumr .gt_column_spanner_outer:first-child {
+padding-left: 0;
+}
+#ierobfiumr .gt_column_spanner_outer:last-child {
+padding-right: 0;
+}
+#ierobfiumr .gt_column_spanner {
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: bottom;
+padding-top: 5px;
+padding-bottom: 5px;
+overflow-x: hidden;
+display: inline-block;
+width: 100%;
+}
+#ierobfiumr .gt_spanner_row {
+border-bottom-style: hidden;
+}
+#ierobfiumr .gt_group_heading {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+text-align: left;
+}
+#ierobfiumr .gt_empty_group_heading {
+padding: 0.5px;
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+vertical-align: middle;
+}
+#ierobfiumr .gt_from_md > :first-child {
+margin-top: 0;
+}
+#ierobfiumr .gt_from_md > :last-child {
+margin-bottom: 0;
+}
+#ierobfiumr .gt_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+margin: 10px;
+border-top-style: solid;
+border-top-width: 1px;
+border-top-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 1px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 1px;
+border-right-color: #D3D3D3;
+vertical-align: middle;
+overflow-x: hidden;
+}
+#ierobfiumr .gt_stub {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ierobfiumr .gt_stub_row_group {
+color: #333333;
+background-color: #FFFFFF;
+font-size: 100%;
+font-weight: initial;
+text-transform: inherit;
+border-right-style: solid;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+padding-left: 5px;
+padding-right: 5px;
+vertical-align: top;
+}
+#ierobfiumr .gt_row_group_first td {
+border-top-width: 2px;
+}
+#ierobfiumr .gt_row_group_first th {
+border-top-width: 2px;
+}
+#ierobfiumr .gt_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ierobfiumr .gt_first_summary_row {
+border-top-style: solid;
+border-top-color: #D3D3D3;
+}
+#ierobfiumr .gt_first_summary_row.thick {
+border-top-width: 2px;
+}
+#ierobfiumr .gt_last_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ierobfiumr .gt_grand_summary_row {
+color: #333333;
+background-color: #FFFFFF;
+text-transform: inherit;
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ierobfiumr .gt_first_grand_summary_row {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-top-style: double;
+border-top-width: 6px;
+border-top-color: #D3D3D3;
+}
+#ierobfiumr .gt_last_grand_summary_row_top {
+padding-top: 8px;
+padding-bottom: 8px;
+padding-left: 5px;
+padding-right: 5px;
+border-bottom-style: double;
+border-bottom-width: 6px;
+border-bottom-color: #D3D3D3;
+}
+#ierobfiumr .gt_striped {
+background-color: rgba(128, 128, 128, 0.05);
+}
+#ierobfiumr .gt_table_body {
+border-top-style: solid;
+border-top-width: 2px;
+border-top-color: #D3D3D3;
+border-bottom-style: solid;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+}
+#ierobfiumr .gt_footnotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#ierobfiumr .gt_footnote {
+margin: 0px;
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ierobfiumr .gt_sourcenotes {
+color: #333333;
+background-color: #FFFFFF;
+border-bottom-style: none;
+border-bottom-width: 2px;
+border-bottom-color: #D3D3D3;
+border-left-style: none;
+border-left-width: 2px;
+border-left-color: #D3D3D3;
+border-right-style: none;
+border-right-width: 2px;
+border-right-color: #D3D3D3;
+}
+#ierobfiumr .gt_sourcenote {
+font-size: 90%;
+padding-top: 4px;
+padding-bottom: 4px;
+padding-left: 5px;
+padding-right: 5px;
+}
+#ierobfiumr .gt_left {
+text-align: left;
+}
+#ierobfiumr .gt_center {
+text-align: center;
+}
+#ierobfiumr .gt_right {
+text-align: right;
+font-variant-numeric: tabular-nums;
+}
+#ierobfiumr .gt_font_normal {
+font-weight: normal;
+}
+#ierobfiumr .gt_font_bold {
+font-weight: bold;
+}
+#ierobfiumr .gt_font_italic {
+font-style: italic;
+}
+#ierobfiumr .gt_super {
+font-size: 65%;
+}
+#ierobfiumr .gt_footnote_marks {
+font-size: 75%;
+vertical-align: 0.4em;
+position: initial;
+}
+#ierobfiumr .gt_asterisk {
+font-size: 100%;
+vertical-align: 0;
+}
+#ierobfiumr .gt_indent_1 {
+text-indent: 5px;
+}
+#ierobfiumr .gt_indent_2 {
+text-indent: 10px;
+}
+#ierobfiumr .gt_indent_3 {
+text-indent: 15px;
+}
+#ierobfiumr .gt_indent_4 {
+text-indent: 20px;
+}
+#ierobfiumr .gt_indent_5 {
+text-indent: 25px;
+}
+#ierobfiumr .katex-display {
+display: inline-flex !important;
+margin-bottom: 0.75em !important;
+}
+#ierobfiumr div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+height: 0px !important;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_title gt_font_normal" style>Largest Increases in Female Undergraduate Share</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="4" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style>Top 3 states, 2010 to 2024</td>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_left" rowspan="1" colspan="1" scope="col" id="state">State</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2010">Female Share (2010)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="a2024">Female Share (2024)</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="change">Change</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr><td headers="state" class="gt_row gt_left">FM</td>
+<td headers="2010" class="gt_row gt_right">53.72%</td>
+<td headers="2024" class="gt_row gt_right">62.87%</td>
+<td headers="change" class="gt_row gt_right">9.15%</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">AS</td>
+<td headers="2010" class="gt_row gt_right">61.19%</td>
+<td headers="2024" class="gt_row gt_right">70.23%</td>
+<td headers="change" class="gt_row gt_right">9.03%</td></tr>
+    <tr><td headers="state" class="gt_row gt_left">NH</td>
+<td headers="2010" class="gt_row gt_right">57.28%</td>
+<td headers="2024" class="gt_row gt_right">61.97%</td>
+<td headers="change" class="gt_row gt_right">4.69%</td></tr>
+  </tbody>
+  
+</table>
+</div>
+<p>This table shows the three states where the fraction of female
+undergraduate students increased the most from 2010 to 2024.</p>
+</div>
+</div>
+<div id="task-7-op-ed-calculations" class="section level2">
+<h2>Task 7: Op-Ed Calculations</h2>
+<pre class="r"><code># Create diversity metrics for undergraduate students
 
-</details>
+op_ed_data &lt;- IPEDS |&gt;
+  filter(level == &quot;all undergrad&quot;) |&gt;
+  mutate(
+    total_students =
+      enrollment_m_aian + enrollment_f_aian +
+      enrollment_m_asia + enrollment_f_asia +
+      enrollment_m_bkaa + enrollment_f_bkaa +
+      enrollment_m_hisp + enrollment_f_hisp +
+      enrollment_m_nhpi + enrollment_f_nhpi +
+      enrollment_m_whit + enrollment_f_whit +
+      enrollment_m_2mor + enrollment_f_2mor +
+      enrollment_m_unkn + enrollment_f_unkn +
+      enrollment_m_nral + enrollment_f_nral,
+
+    non_white_non_asian =
+      enrollment_m_aian + enrollment_f_aian +
+      enrollment_m_bkaa + enrollment_f_bkaa +
+      enrollment_m_hisp + enrollment_f_hisp +
+      enrollment_m_nhpi + enrollment_f_nhpi +
+      enrollment_m_2mor + enrollment_f_2mor,
+
+    diversity_share = non_white_non_asian / total_students
+  )
+
+# Focus on Baruch College
+baruch_data &lt;- op_ed_data |&gt;
+  filter(str_detect(institution_name, &quot;Baruch&quot;))</code></pre>
+<hr />
+</div>
+<div id="op-ed-building-a-more-inclusive-campus-at-baruch-college" class="section level2">
+<h2>Op-Ed: Building a More Inclusive Campus at Baruch College</h2>
+<p>As president of Baruch College, I believe that diversity is
+fundamental to the educational mission of our institution. Diversity
+strengthens our classrooms, broadens our perspectives, and prepares our
+students to thrive in an increasingly interconnected world. For the
+purposes of this discussion, I define diversity as the share of
+undergraduate students who identify as non-White and non-Asian American.
+This definition reflects the historical disparities that have shaped
+access to higher education in the United States.</p>
+<p>Baruch College currently serves a large and vibrant undergraduate
+community. In 2024 the college enrolled approximately 16,496
+undergraduate students. These students represent a wide range of
+backgrounds, cultures, and life experiences, contributing to a dynamic
+learning environment that prepares graduates for leadership in New York
+City and beyond.</p>
+<p>Examining the incoming first-year class provides insight into how our
+institution is evolving. Over the past several years, the number of
+first-year undergraduate students has fluctuated modestly. These changes
+reflect broader trends in college enrollment nationwide, including
+demographic shifts and the lingering impacts of the COVID-19 pandemic.
+Despite these fluctuations, Baruch continues to attract a strong cohort
+of students committed to academic achievement and civic engagement.</p>
+<p>Looking at the full undergraduate population, we also see important
+demographic trends. The proportion of students who fall within our
+diversity definition has gradually changed over time. In 2010 the share
+of non-White and non-Asian students was approximately 25.54%. By 2024
+this share had changed to 40.34%. While year-to-year changes are often
+small, the long-term trend illustrates the evolving composition of our
+student body.</p>
+<p>It is important to consider these changes in the broader national
+context. Public universities in California have operated under
+restrictions on affirmative action since the passage of Proposition 209
+in 1996. Because these institutions did not experience a policy shift
+following the Supreme Court’s decision in <em>Students for Fair
+Admissions v. Harvard</em>, they provide a useful benchmark for
+evaluating our own enrollment patterns. If the changes we observe at
+Baruch mirror those in California institutions, it suggests that many
+fluctuations may be driven by broader demographic or societal trends
+rather than policy shifts alone.</p>
+<p>Ultimately, diversity is not simply a number or a percentage—it is a
+commitment. At Baruch College, we remain dedicated to expanding
+opportunity, fostering inclusion, and ensuring that every student has
+the chance to succeed. By continuing to evaluate our data and reflect on
+our mission, we can ensure that our campus remains a place where all
+students are empowered to learn, lead, and contribute to our diverse
+society.</p>
+<div class="callout-note" title="AI Usage Statement" collapse="true">
+<p>I used Generative AI tools to assist with the coding portions of this
+mini-project, including troubleshooting R errors, understanding how to
+structure dplyr pipelines, and formatting Quarto code chunks so that the
+document rendered correctly. AI was used only to help debug code and
+explain programming concepts when errors occurred during the analysis
+process. All written analysis, explanations, and the Op-Ed text were
+written independently without the use of Generative AI editing or text
+generation tools, in accordance with the course policy.</p>
+<p>Izabelle Diaz</p>
+</div>
+</div>
 
 
 
@@ -1490,6 +3242,7 @@ $(document).ready(function () {
 
 <!-- code folding -->
 
+
 <!-- dynamically load mathjax for compatibility with self-contained -->
 <script>
   (function () {
@@ -1502,8 +3255,3 @@ $(document).ready(function () {
 
 </body>
 </html>
-
-
-
-
-
