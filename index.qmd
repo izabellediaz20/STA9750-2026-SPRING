@@ -1,12 +1,17 @@
 ---
 title: "Izabelle Diaz — STA 9750"
+format: 
+  html: default
+  pdf: default
 engine: knitr
 ---
 
 Hi! I'm Izabelle Diaz, a Master's student at Baruch College.
-```{r}
-#| include: false
-1+1
+
 ```
 
 Last Updated: `r format(Sys.time(), "%A %m %d, %Y at %I:%M%p")`
+```{r}
+#| include: false 
+1+1
+```

@@ -1,0 +1,49 @@
+peer_feedback_assignment_1:
+  issue_number: 11
+  issue_owner: helly101-1
+  issue_ok: yes
+  issue_status: OK
+  overall_comments:
+    positive: The submission is well structured and successfully passed all automated
+      checks, showing that the project setup and required components were implemented
+      correctly.
+    negative: One area for improvement would be adding more explanatory detail in
+      the written sections to provide clearer context for readers.
+    advice: Adding a brief introductory explanation and expanding the written descriptions
+      would help improve clarity and make the submission easier for readers to follow.
+  scores: []
+  mp_number: 0.0
+peer_feedback_assignment_2:
+  issue_number: 17
+  issue_owner: kevmarcel0
+  issue_ok: yes
+  issue_status: OK
+  overall_comments:
+    positive: |-
+      The submission is well structured and the project components appear to be implemented correctly, making the work easy to navigate
+      The presentation is clean and organized, which helps improve overall readability.
+    negative: |-
+      One area for improvement would be expanding the written explanations to provide more context for readers.
+      Adding slightly more descriptive comments or labels could further enhance clarity.
+    advice: |-
+      Including a more detailed introduction and expanding the explanatory text throughout the submission would make the work easier to follow.
+      Overall, strong work—just a bit more detail in the explanations would make it even better.
+  scores: []
+  mp_number: 0.0
+peer_feedback_assignment_3:
+  issue_number: 20
+  issue_owner: janielave
+  issue_ok: yes
+  issue_status: OK
+  overall_comments:
+    positive: The submission is clearly organized and demonstrates that the required
+      project components were implemented successfully.
+    negative: |-
+      One area for improvement would be providing slightly more detailed explanations to help guide readers through the work.
+      Adding a bit more descriptive commentary in key sections could further enhance clarity.
+    advice: Expanding the introductory text and adding more detailed descriptions
+      throughout the submission would improve readability and context.
+  scores: []
+  mp_number: 0.0
+evaluator: izabellediaz20
+
