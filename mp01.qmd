@@ -216,5 +216,3 @@ IPEDS |>
 ## AI Usage Statement
 
 Generative AI tools (ChatGPT) were used to help troubleshoot coding errors and understand R/Quarto workflow steps. All analysis and code execution were completed and verified by Izabelle Diaz.
-
-
