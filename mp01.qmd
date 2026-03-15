@@ -513,6 +513,8 @@ It is important to consider these changes in the broader national context. Publi
 
 Ultimately, diversity is not simply a number or a percentage—it is a commitment. At Baruch College, we remain dedicated to expanding opportunity, fostering inclusion, and ensuring that every student has the chance to succeed. By continuing to evaluate our data and reflect on our mission, we can ensure that our campus remains a place where all students are empowered to learn, lead, and contribute to our diverse society.
 
+## AI Usage Statement
+
 ::: {.callout-note title="AI Usage Statement" collapse="true"}
 
 I used Generative AI tools only to assist with coding-related tasks while completing this mini-project. AI was used to help troubleshoot R errors, understand how to structure dplyr pipelines, and format Quarto code chunks so the document rendered correctly. All written analysis, explanations, and the Op-Ed text were written independently without the use of Generative AI text generation or editing tools, in accordance with the course policy.
