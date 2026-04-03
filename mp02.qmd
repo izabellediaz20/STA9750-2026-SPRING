@@ -51,13 +51,6 @@ load_atus_data <- function(file_base = c("resp", "rost", "act")) {
         resp = file |>
             mutate(
                 children_under_18 = TRCHILDNUM,
-                partner_status = case_match(
-                    TRSPPRES,
-                    1 ~ "Spouse present",
-                    2 ~ "Unmarried partner present",
-                    3 ~ "No spouse or partner present",
-                    .default = "Other"
-                ),
                 employment_status = case_match(
                     TELFS,
                     1 ~ "Employed - at work",
@@ -66,18 +59,6 @@ load_atus_data <- function(file_base = c("resp", "rost", "act")) {
                     4 ~ "Unemployed - looking",
                     5 ~ "Not in labor force",
                     .default = "Other"
-                ),
-                full_or_part_time = case_match(
-                    TRDPFTPT,
-                    1 ~ "Full-time",
-                    2 ~ "Part-time",
-                    .default = NA_character_
-                ),
-                college_student = if_else(
-                    TESCHENR == 1 & TESCHLVL == 2,
-                    TRUE,
-                    FALSE,
-                    missing = FALSE
                 )
             ) |>
             rename(
@@ -86,56 +67,13 @@ load_atus_data <- function(file_base = c("resp", "rost", "act")) {
                 survey_year = TUYEAR
             ),
 
-        rost = file |>
-            mutate(
-                sex = case_match(
-                    TESEX,
-                    1 ~ "M",
-                    2 ~ "F",
-                    .default = NA_character_
-                )
-            ),
+        rost = file,
 
         act = file |>
-    mutate(
-        activity_n_of_day = TUACTIVITY_N,
-        time_spent_min = TUACTDUR24,
-        start_time = TUSTARTTIM,
-        stop_time = TUSTOPTIME,
-        level1_code = paste0(TRTIER1P, "0000"),
-level2_code = paste0(TRTIER1P, TRTIER2P, "00"),
-        level3_code = TRCODEP,
-        location = case_match(
-            TEWHERE,
-            1 ~ "Home",
-            2 ~ "Work",
-            3 ~ "Someone else's home",
-            4 ~ "Restaurant or bar",
-            5 ~ "Place of worship",
-            6 ~ "Grocery store",
-            7 ~ "Other store/mall",
-            8 ~ "School",
-            9 ~ "Outdoors away from home",
-            10 ~ "Library",
-            11 ~ "Other place",
-            12 ~ "Car driver",
-            13 ~ "Car passenger",
-            14 ~ "Walking",
-            15 ~ "Bus",
-            16 ~ "Subway/train",
-            17 ~ "Bicycle",
-            18 ~ "Boat/ferry",
-            19 ~ "Taxi",
-            20 ~ "Airplane",
-            21 ~ "Other transportation",
-            30 ~ "Bank",
-            31 ~ "Gym",
-            32 ~ "Post office",
-            89 ~ "Unspecified place",
-            99 ~ "Unspecified transportation",
-            .default = "Unknown"
-        )
-    )
+            mutate(
+                time_spent_min = TUACTDUR24,
+                level3_code = TRCODEP
+            )
     )
 
     result |>
@@ -143,346 +81,168 @@ level2_code = paste0(TRTIER1P, TRTIER2P, "00"),
 }
 
 atus_resp <- load_atus_data("resp")
-atus_rost <- load_atus_data("rost")
 atus_act  <- load_atus_data("act")
 
-load_atus_activities <- function() {
-    if (!dir.exists(file.path("data", "mp02"))) {
-        dir.create(file.path("data", "mp02"), showWarnings = FALSE, recursive = TRUE)
-    }
-    
-    dest_file <- file.path("data", "mp02", "atus_activity_codes.csv")
-    
-    if (!file.exists(dest_file)) {
-        download.file(
-            "https://michael-weylandt.com/STA9750/mini/atus_activity_codes.csv",
-            quiet = TRUE,
-            destfile = dest_file,
-            mode = "wb"
-        )
-    }
-    
-    read_csv(dest_file, show_col_types = FALSE)
-}
-
-atus_activity_labels <- load_atus_activities()
+atus_activity_labels <- read_csv(
+  "https://michael-weylandt.com/STA9750/mini/atus_activity_codes.csv",
+  show_col_types = FALSE
+)
 ```
 
-The ATUS data was loaded using the instructor-provided functions for the
-respondent, roster, and activity files, along with the activity code
-lookup table. This created four datasets: `atus_resp`, `atus_rost`,
-`atus_act`, and `atus_activity_labels`.
+The ATUS data was loaded using the instructor-provided functions for the respondent and activity files, along with the activity code lookup table. This created three datasets: `atus_resp`, `atus_act`, and `atus_activity_labels`.
 
-The respondent dataset contains demographic and survey-level information
-for each participant, including variables such as survey year and survey
-weight. The activity dataset contains detailed time-use records, where
-each row represents one activity completed by a participant along with
-its duration and activity code. The roster dataset adds information
-about other people connected to the respondent’s activities. The
-activity labels dataset provides readable names for activity codes.
+The respondent dataset contains demographic and survey-level information for each participant, including variables such as survey year and survey weight. The activity dataset contains detailed time-use records, where each row represents one activity completed by a participant along with its duration and activity code. The activity labels dataset provides readable names for activity codes.
 
-Based on the structure of these datasets, the main key used to connect
-them is `participant_id`. The activity dataset can also be joined with
-the activity labels dataset using activity codes to translate numeric
-values into meaningful activity names.
+Based on the structure of these datasets, the main key used to connect them is `participant_id`. The activity dataset can also be joined with the activity labels dataset using activity codes to translate numeric values into meaningful activity names.
+
+---
 
 ## Task 2: Practice Joining Data Files
 
-``` r
-# Question 1: Total hours spent on sleeping-type activities
-
-# Explanation:
-# We join the activity dataset with the activity labels dataset so we can identify
-# which activities correspond to sleeping. We use a higher-level activity code to
-# capture all sleeping-related activities, then sum total minutes and convert to hours.
-
+```{r}
 sleep_total_hours <- atus_act |>
-    inner_join(atus_activity_labels, join_by(level1_code == code)) |>
-    filter(str_detect(tolower(activity), "sleep")) |>
+    inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |>
+    filter(str_detect(tolower(task_level3), "sleep")) |>
     summarise(total_hours = sum(time_spent_min, na.rm = TRUE) / 60)
 
 sleep_total_hours
 
-
-# Question 2: Female participants with no time alone in 2003
-
-# Explanation:
-# No join is needed because all variables are already in the respondent dataset.
-# We use survey_year, time_alone, and TESEX (converted to readable labels).
-
 female_no_time_alone_2003 <- atus_resp |>
-    mutate(sex = case_match(TESEX, 1 ~ "M", 2 ~ "F")) |>
-    filter(survey_year == 2003, sex == "F", time_alone == 0) |>
+    filter(survey_year == 2003, time_alone == 0) |>
     summarise(total_participants = n())
 
 female_no_time_alone_2003
 ```
 
-For the first question, the activity table provides the time values,
-while the activity label table provides the meaning of the activity
-codes, so a join would be needed. For the second question, no join would
-be needed because the respondent table already contains survey year,
-time alone, and sex.
+For the first question, the activity table provides the time values, while the activity label table provides the meaning of the activity codes, so a join is required. For the second question, no join is needed because the respondent table already contains survey year and time alone.
+
+---
 
 ## Task 3: Adding Additional Demographic Variables
 
-To complete Task 3, I modified the `load_atus_data` function to include
-additional demographic and contextual variables from the ATUS datasets.
-The number of children under 18 in the household was captured using
-`TRCHILDNUM`.
+To complete Task 3, I modified the data loading function to include additional demographic variables such as the number of children under 18 and employment status. The number of children was captured using `TRCHILDNUM`, while employment status was derived from `TELFS`, which classifies respondents based on their labor force participation.
 
-Marital or partner status was approximated using `TRSPPRES`, which
-identifies whether a spouse or unmarried partner is present in the
-household. Employment status was derived from `TELFS`, which classifies
-respondents based on labor force participation, and full-time versus
-part-time status was added using `TRDPFTPT`.
+These additional variables help provide more context for analyzing how individuals spend their time across different demographic groups.
 
-College enrollment required combining two variables, `TESCHENR` and
-`TESCHLVL`, using a Boolean condition to identify respondents enrolled
-in college or university rather than high school.
-
-Finally, the location of each activity was added from the activity
-dataset using `TEWHERE` and recoded into more interpretable categories.
-All transformations were implemented using `case_match` and logical
-conditions to convert numeric codes into readable values.
+---
 
 ## Task 4: Exploratory Questions - Inline Values
 
 ```{r}
-# Total respondents
 total_respondents <- n_distinct(atus_resp$participant_id)
 
-# Number of sports
-sports_count <- sum(grepl("sport", tolower(atus_activity_labels$task_level3)))
-
-# Retired percentage
-atus_resp <- atus_resp |> 
-  mutate(retired = employment_status == "Not in labor force")
-
-percent_retired <- weighted.mean(
-  atus_resp$retired,
-  atus_resp$survey_weight,
-  na.rm = TRUE
-) * 100
-
-# Sleep hours
 sleep_hours <- atus_act |>
   inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |>
   filter(str_detect(tolower(task_level3), "sleep")) |>
   summarise(hours = mean(time_spent_min, na.rm = TRUE) / 60) |>
   pull(hours)
-
-# Childcare hours
-childcare_hours <- atus_act |>
-  inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |>
-  inner_join(atus_resp, join_by(participant_id)) |>
-  filter(
-    children_under_18 > 0,
-    str_detect(tolower(task_level3), "care|child|education|health")
-  ) |>
-  summarise(hours = mean(time_spent_min, na.rm = TRUE) / 60) |>
-  pull(hours)
 ```
 
-Since 2003, 252,808 different respondents have completed an ATUS survey.
+Since 2003, `r total_respondents` different respondents have completed an ATUS survey.
 
-ATUS asks about 24 different sports as Level 3 watching activities.
+On average, Americans sleep about `r round(sleep_hours, 2)` hours per day.
 
-Approximately 32.18 percent of Americans are retired.
-
-On average, Americans sleep about 4.04 hours per night.
-
-On average, Americans with one or more children in the home spend about
-0.60 hours per day taking care of their children.
-
-On average, Americans with one or more children in the home spend about
-0.60 hours per day taking care of their children.
+---
 
 ## Task 5: Exploratory Questions - Table Answers
 
-```{r}library(gt)
+```{r}
+library(gt)
 
-lawn_care \<- atus_act \|\> inner_join(atus_activity_labels,
-join_by(level3_code == code_level3)) \|\> inner_join(atus_resp,
-join_by(participant_id)) \|\> filter(str_detect(tolower(task_level3),
-"lawn")) \|\> mutate(group = case_when( employment_status == "Not in
-labor force" \~ "Retired", employment_status == "Employed - at work" \~
-"Full-time", TRUE \~ "Other" )) \|\> filter(group %in% c("Retired",
-"Full-time")) \|\> group_by(group) \|\> summarise(avg_minutes =
-mean(time_spent_min, na.rm = TRUE)) \|\> mutate(avg_hours = avg_minutes
-/ 60)
+lawn_care <- atus_act |>
+  inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |>
+  inner_join(atus_resp, join_by(participant_id)) |>
+  filter(str_detect(tolower(task_level3), "lawn")) |>
+  mutate(group = case_when(
+    employment_status == "Not in labor force" ~ "Not working",
+    employment_status == "Employed - at work" ~ "Working",
+    TRUE ~ "Other"
+  )) |>
+  filter(group %in% c("Not working", "Working")) |>
+  group_by(group) |>
+  summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE)) |>
+  mutate(avg_hours = avg_minutes / 60)
 
-lawn_care \|\> gt()
+lawn_care |> gt()
+```
+
+---
 
 ## Task 6: Exploratory Questions - Graph Answers
 
-### Household Activities and Age
+```{r}
+household_plot <- atus_act |>
+  inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |>
+  inner_join(atus_resp, join_by(participant_id)) |>
+  filter(str_detect(tolower(task_level1), "household")) |>
+  group_by(TEAGE) |>
+  summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE), .groups = "drop")
 
-```{r} household_plot \<- atus_act \|\>
-inner_join(atus_activity_labels, join_by(level3_code == code_level3))
-\|\> inner_join(atus_resp, join_by(participant_id)) \|\>
-filter(str_detect(tolower(task_level1), "household")) \|\>
-mutate(age_group = cut(TRAGE, breaks = 5)) \|\> group_by(age_group) \|\>
-summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE))
+ggplot(household_plot, aes(x = TEAGE, y = avg_minutes)) +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    title = "Time Spent on Household Activities by Age",
+    x = "Age",
+    y = "Average Minutes"
+  )
+```
 
-ggplot(household_plot, aes(x = age_group, y = avg_minutes)) +
-geom_col() + theme_minimal() + labs(title = "Time Spent on Household
-Activities by Age Group", x = "Age Group", y = "Average Minutes") As
-Americans age, time spent on household activities generally increases.
-Older age groups tend to spend more time on these activities compared to
-younger individuals, suggesting greater responsibility for home
-maintenance.
+As age increases, time spent on household activities generally increases as well. Older individuals tend to spend more time on these responsibilities compared to younger groups.
 
-summer_activities \<- atus_act \|\> inner_join(atus_activity_labels,
-join_by(level3_code == code_level3)) \|\> inner_join(atus_resp,
-join_by(participant_id)) \|\> filter(TUMONTH %in% c(6,7,8)) \|\>
-count(task_level3, sort = TRUE) \|\> slice_head(n = 10)
-
-ggplot(summer_activities, aes(x = reorder(task_level3, n), y = n)) +
-geom_col() + coord_flip() + theme_minimal() + labs(title = "Most Common
-Activities During Summer", x = "Activity", y = "Count") During the
-summer months, Americans most frequently engage in leisure and personal
-activities. This suggests that time away from structured work schedules
-leads to increased participation in relaxation and daily-life
-activities.
-
-education_time \<- atus_act \|\> inner_join(atus_activity_labels,
-join_by(level3_code == code_level3)) \|\> inner_join(atus_resp,
-join_by(participant_id)) \|\> filter(college_student == TRUE,
-str_detect(tolower(task_level3), "study\|class\|homework")) \|\>
-mutate(age_group = cut(TRAGE, breaks = 5)) \|\> group_by(age_group) \|\>
-summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE))
-
-ggplot(education_time, aes(x = age_group, y = avg_minutes)) +
-geom_col() + theme_minimal() + labs(title = "Education Time by Age
-Group", x = "Age Group", y = "Average Minutes") Older students tend to
-spend slightly more time on educational activities compared to younger
-students. This suggests that older individuals may take their education
-more seriously or have more structured study habits. library(ggbump)
-
-library(ggbump)
-
-sports_rank \<- atus_act \|\> inner_join(atus_activity_labels,
-join_by(level3_code == code_level3)) \|\> inner_join(atus_resp,
-join_by(participant_id)) \|\> filter(str_detect(tolower(task_level3),
-"sport")) \|\> mutate(age_group = cut(TRAGE, breaks = 5)) \|\>
-group_by(age_group, task_level3) \|\> summarise(n = n(), .groups =
-"drop") \|\> group_by(age_group) \|\> mutate(rank = rank(-n))
-
-ggplot(sports_rank, aes(x = age_group, y = rank, color = task_level3)) +
-geom_bump() + theme_minimal() + labs(title = "Sports Interest by Age
-Group", x = "Age Group", y = "Rank") The ranking of sports activities
-varies across age groups, indicating that preferences for different
-sports shift as individuals age. Some sports remain consistently
-popular, while others fluctuate in interest.
-
-child_time \<- atus_act \|\> inner_join(atus_activity_labels,
-join_by(level3_code == code_level3)) \|\> inner_join(atus_resp,
-join_by(participant_id)) \|\> filter(children_under_18 \> 0,
-str_detect(tolower(task_level3), "care\|child")) \|\>
-group_by(children_under_18) \|\> summarise(total_minutes =
-mean(time_spent_min, na.rm = TRUE)) \|\> mutate(time_per_child =
-total_minutes / children_under_18)
-
-ggplot(child_time, aes(x = children_under_18, y = time_per_child)) +
-geom_line() + geom_point() + theme_minimal() + labs(title = "Time Spent
-Per Child by Family Size", x = "Number of Children", y = "Minutes per
-Child") As family size increases, the amount of time spent per child
-decreases. This supports the idea of “middle-child syndrome,” where
-parental attention becomes more divided among multiple children.
+---
 
 ## Task 7: Time Use Categories for Target Demographics
 
 ### Stay-at-Home Dads
 
-The first target demographic is stay-at-home fathers. This group is
-defined as adult men who are not in the labor force and have at least
-one child under the age of 18 in the household. These individuals are
-likely responsible for childcare and household responsibilities.
+The first target demographic is stay-at-home fathers. This group is defined as adult men who are not in the labor force and have at least one child under the age of 18 in the household. These individuals are likely responsible for childcare and household responsibilities.
 
-Key activities for this group include childcare, household work, and
-personal time such as sleep. Based on the data, childcare and household
-activities take up a significant portion of their day.
+Key activities for this group include childcare, household work, and personal time such as sleep. Based on the data, childcare and household activities take up a significant portion of their day.
 
-Typical time use levels: - Childcare: Low = 1 hour, Medium = 3 hours,
-High = 6 hours\
-- Household activities: Low = 1 hour, Medium = 2.5 hours, High = 5
-hours\
-- Sleep: Low = 5 hours, Medium = 7 hours, High = 9 hours
+Typical time use levels:  
+- Childcare: Low = 1 hour, Medium = 3 hours, High = 6 hours  
+- Household activities: Low = 1 hour, Medium = 2.5 hours, High = 5 hours  
+- Sleep: Low = 5 hours, Medium = 7 hours, High = 9 hours  
 
-Target levels were set slightly above the medium level for childcare and
-household tasks, as these are key responsibilities. A reasonable target
-would be around 4–5 hours of childcare and 3–4 hours of household work
-per day.
-
-A relatively small portion of this demographic reaches the higher target
-levels consistently, especially for childcare, indicating that time
-constraints may limit how much attention can be given per child.
-
-------------------------------------------------------------------------
+---
 
 ### College Undergraduates
 
-The second demographic is college undergraduate students. This group is
-defined as individuals who are currently enrolled in college-level
-education programs and are typically between ages 18 and 24.
+The second demographic is college undergraduate students. This group is defined as individuals who are currently enrolled in college-level education programs and are typically between ages 18 and 24.
 
-Key activities include studying, attending class, sleeping, and leisure
-activities. While students spend time on education, there is also a
-significant amount of time allocated to personal and recreational
-activities.
+Key activities include studying, attending class, sleeping, and leisure activities. While students spend time on education, there is also a significant amount of time allocated to personal and recreational activities.
 
-Typical time use levels: - Studying / education: Low = 1 hour, Medium =
-3 hours, High = 6 hours\
-- Sleep: Low = 5 hours, Medium = 7 hours, High = 9 hours\
-- Leisure/social activities: Low = 2 hours, Medium = 4 hours, High = 7
-hours
+Typical time use levels:  
+- Studying: Low = 1 hour, Medium = 3 hours, High = 6 hours  
+- Sleep: Low = 5 hours, Medium = 7 hours, High = 9 hours  
+- Leisure: Low = 2 hours, Medium = 4 hours, High = 7 hours  
 
-Target levels emphasize academic productivity, with a suggested goal of
-4–5 hours per day dedicated to education-related activities.
+---
 
-Only a moderate share of students meet these higher targets, suggesting
-that time management and prioritization could be improved within this
-group.
+### Young Working Professionals
 
-------------------------------------------------------------------------
+The final demographic is young working professionals. This group is defined as individuals between the ages of 22 and 30 who are employed full-time and not currently enrolled in school.
 
-### Young Working Professionals (Chosen Demographic)
+Key activities include work, exercise, sleep, and leisure. This group often balances career development with personal well-being.
 
-The final demographic is young working professionals. This group is
-defined as individuals between the ages of 22 and 30 who are employed
-full-time and not currently enrolled in school.
+Typical time use levels:  
+- Work: Low = 6 hours, Medium = 8 hours, High = 10+ hours  
+- Exercise: Low = 0.5 hours, Medium = 1 hour, High = 2 hours  
+- Sleep: Low = 5 hours, Medium = 7 hours, High = 8+ hours  
 
-Key activities include work, exercise, sleep, and leisure. This group
-often balances career development with personal well-being.
+---
 
-Typical time use levels: - Work: Low = 6 hours, Medium = 8 hours, High =
-10+ hours\
-- Exercise: Low = 0.5 hours, Medium = 1 hour, High = 2 hours\
-- Sleep: Low = 5 hours, Medium = 7 hours, High = 8+ hours
 
-Target levels focus on maintaining balance, such as 8 hours of work, at
-least 1 hour of exercise, and 7–8 hours of sleep.
+<div style="border-left:6px solid #3b82f6; background-color:#eff6ff; padding:12px 16px; border-radius:6px;">
 
-A relatively small percentage of this group meets all target levels
-simultaneously, especially for exercise, suggesting that healthy habits
-are often deprioritized due to work demands.
+<details>
+<summary><strong>AI Usage Statement (click to expand)</strong></summary>
 
-------------------------------------------------------------------------
-
-### Summary
-
-Across all three demographics, there is a clear gap between typical and
-target time use, particularly in areas related to health and
-productivity such as sleep, exercise, and focused work. This highlights
-an opportunity for a time-tracking app to help users better manage their
-time and improve daily habits through comparison and goal-setting
-features.
-
-## AI Usage Statement
-
-::: {.callout-note title="AI Usage Statement" collapse="true"}
+<br>
 
 I used ChatGPT to help debug R errors, understand Quarto formatting, and structure my code for data loading, joining, and summarizing. I reviewed all outputs and made sure I understood the logic behind each step before including it in my submission.
 
-:::
+</details>
+
+</div>
