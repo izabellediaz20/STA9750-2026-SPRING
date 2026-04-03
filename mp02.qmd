@@ -188,7 +188,7 @@ ggplot(household_plot, aes(x = TEAGE, y = avg_minutes)) +
   )
 ```
 
-As age increases, time spent on household activities generally increases as well. Older individuals tend to spend more time on these responsibilities compared to younger groups.
+As age increases, the amount of time spent on household activities generally increases. Younger individuals tend to spend less time on these tasks, while older adults dedicate more time to household responsibilities, likely due to lifestyle changes and increased domestic responsibilities.
 
 ---
 
