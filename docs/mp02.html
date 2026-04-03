@@ -241,42 +241,46 @@ sleep_hours &lt;- atus_act |&gt;
 <p>Since 2003, 252808 different respondents have completed an ATUS survey.</p>
 <p>On average, Americans sleep about 4.04 hours per day.</p>
 <hr />
-<h2 id="sec:task-5-exploratory-questions-table-answers">Task 5: Exploratory Questions - Table Answers</h2>
+<h2 id="sec:task-5-exploratory-questions-table-answers_1">Task 5: Exploratory Questions - Table Answers</h2>
+<h2 id="sec:task-5-exploratory-questions-table-answers_2">Task 5: Exploratory Questions - Table Answers</h2>
 <pre><code class="language-r">library(gt)
 
 lawn_care &lt;- atus_act |&gt;
   inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |&gt;
   inner_join(atus_resp, join_by(participant_id)) |&gt;
   filter(str_detect(tolower(task_level3), &quot;lawn&quot;)) |&gt;
-  mutate(group = case_when(
-    employment_status == &quot;Not in labor force&quot; ~ &quot;Not working&quot;,
-    employment_status == &quot;Employed - at work&quot; ~ &quot;Working&quot;,
-    TRUE ~ &quot;Other&quot;
-  )) |&gt;
-  filter(group %in% c(&quot;Not working&quot;, &quot;Working&quot;)) |&gt;
+  mutate(
+    group = case_when(
+      employment_status == &quot;Not in labor force&quot; ~ &quot;Retired&quot;,
+      employment_status == &quot;Employed - at work&quot; ~ &quot;Full-time&quot;,
+      TRUE ~ &quot;Other&quot;
+    )
+  ) |&gt;
+  filter(group %in% c(&quot;Retired&quot;, &quot;Full-time&quot;)) |&gt;
   group_by(group) |&gt;
-  summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE)) |&gt;
+  summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE), .groups = &quot;drop&quot;) |&gt;
   mutate(avg_hours = avg_minutes / 60)
 
-lawn_care |&gt; gt()
+lawn_care |&gt;
+  gt()
 </code></pre>
-<!--html_preserve--><div id="bpasrnngxp" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#bpasrnngxp table {
+<!--html_preserve--><div id="klqrcyqnrb" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#klqrcyqnrb table {
   font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#bpasrnngxp thead, #bpasrnngxp tbody, #bpasrnngxp tfoot, #bpasrnngxp tr, #bpasrnngxp td, #bpasrnngxp th {
+#klqrcyqnrb thead, #klqrcyqnrb tbody, #klqrcyqnrb tfoot, #klqrcyqnrb tr, #klqrcyqnrb td, #klqrcyqnrb th {
   border-style: none;
 }
 
-#bpasrnngxp p {
+#klqrcyqnrb p {
   margin: 0;
   padding: 0;
 }
 
-#bpasrnngxp .gt_table {
+#klqrcyqnrb .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -302,12 +306,12 @@ lawn_care |&gt; gt()
   border-left-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_caption {
+#klqrcyqnrb .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#bpasrnngxp .gt_title {
+#klqrcyqnrb .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -319,7 +323,7 @@ lawn_care |&gt; gt()
   border-bottom-width: 0;
 }
 
-#bpasrnngxp .gt_subtitle {
+#klqrcyqnrb .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -331,7 +335,7 @@ lawn_care |&gt; gt()
   border-top-width: 0;
 }
 
-#bpasrnngxp .gt_heading {
+#klqrcyqnrb .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -343,13 +347,13 @@ lawn_care |&gt; gt()
   border-right-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_bottom_border {
+#klqrcyqnrb .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_col_headings {
+#klqrcyqnrb .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -364,7 +368,7 @@ lawn_care |&gt; gt()
   border-right-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_col_heading {
+#klqrcyqnrb .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -384,7 +388,7 @@ lawn_care |&gt; gt()
   overflow-x: hidden;
 }
 
-#bpasrnngxp .gt_column_spanner_outer {
+#klqrcyqnrb .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -396,15 +400,15 @@ lawn_care |&gt; gt()
   padding-right: 4px;
 }
 
-#bpasrnngxp .gt_column_spanner_outer:first-child {
+#klqrcyqnrb .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#bpasrnngxp .gt_column_spanner_outer:last-child {
+#klqrcyqnrb .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#bpasrnngxp .gt_column_spanner {
+#klqrcyqnrb .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -416,11 +420,11 @@ lawn_care |&gt; gt()
   width: 100%;
 }
 
-#bpasrnngxp .gt_spanner_row {
+#klqrcyqnrb .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#bpasrnngxp .gt_group_heading {
+#klqrcyqnrb .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -446,7 +450,7 @@ lawn_care |&gt; gt()
   text-align: left;
 }
 
-#bpasrnngxp .gt_empty_group_heading {
+#klqrcyqnrb .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -461,15 +465,15 @@ lawn_care |&gt; gt()
   vertical-align: middle;
 }
 
-#bpasrnngxp .gt_from_md > :first-child {
+#klqrcyqnrb .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#bpasrnngxp .gt_from_md > :last-child {
+#klqrcyqnrb .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#bpasrnngxp .gt_row {
+#klqrcyqnrb .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -488,7 +492,7 @@ lawn_care |&gt; gt()
   overflow-x: hidden;
 }
 
-#bpasrnngxp .gt_stub {
+#klqrcyqnrb .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -501,7 +505,7 @@ lawn_care |&gt; gt()
   padding-right: 5px;
 }
 
-#bpasrnngxp .gt_stub_row_group {
+#klqrcyqnrb .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -515,15 +519,15 @@ lawn_care |&gt; gt()
   vertical-align: top;
 }
 
-#bpasrnngxp .gt_row_group_first td {
+#klqrcyqnrb .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#bpasrnngxp .gt_row_group_first th {
+#klqrcyqnrb .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#bpasrnngxp .gt_summary_row {
+#klqrcyqnrb .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -533,16 +537,16 @@ lawn_care |&gt; gt()
   padding-right: 5px;
 }
 
-#bpasrnngxp .gt_first_summary_row {
+#klqrcyqnrb .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_first_summary_row.thick {
+#klqrcyqnrb .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#bpasrnngxp .gt_last_summary_row {
+#klqrcyqnrb .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -552,7 +556,7 @@ lawn_care |&gt; gt()
   border-bottom-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_grand_summary_row {
+#klqrcyqnrb .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -562,7 +566,7 @@ lawn_care |&gt; gt()
   padding-right: 5px;
 }
 
-#bpasrnngxp .gt_first_grand_summary_row {
+#klqrcyqnrb .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -572,7 +576,7 @@ lawn_care |&gt; gt()
   border-top-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_last_grand_summary_row_top {
+#klqrcyqnrb .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -582,11 +586,11 @@ lawn_care |&gt; gt()
   border-bottom-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_striped {
+#klqrcyqnrb .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#bpasrnngxp .gt_table_body {
+#klqrcyqnrb .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -595,7 +599,7 @@ lawn_care |&gt; gt()
   border-bottom-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_footnotes {
+#klqrcyqnrb .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -609,7 +613,7 @@ lawn_care |&gt; gt()
   border-right-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_footnote {
+#klqrcyqnrb .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -618,7 +622,7 @@ lawn_care |&gt; gt()
   padding-right: 5px;
 }
 
-#bpasrnngxp .gt_sourcenotes {
+#klqrcyqnrb .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -632,7 +636,7 @@ lawn_care |&gt; gt()
   border-right-color: #D3D3D3;
 }
 
-#bpasrnngxp .gt_sourcenote {
+#klqrcyqnrb .gt_sourcenote {
   font-size: 90%;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -640,72 +644,72 @@ lawn_care |&gt; gt()
   padding-right: 5px;
 }
 
-#bpasrnngxp .gt_left {
+#klqrcyqnrb .gt_left {
   text-align: left;
 }
 
-#bpasrnngxp .gt_center {
+#klqrcyqnrb .gt_center {
   text-align: center;
 }
 
-#bpasrnngxp .gt_right {
+#klqrcyqnrb .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#bpasrnngxp .gt_font_normal {
+#klqrcyqnrb .gt_font_normal {
   font-weight: normal;
 }
 
-#bpasrnngxp .gt_font_bold {
+#klqrcyqnrb .gt_font_bold {
   font-weight: bold;
 }
 
-#bpasrnngxp .gt_font_italic {
+#klqrcyqnrb .gt_font_italic {
   font-style: italic;
 }
 
-#bpasrnngxp .gt_super {
+#klqrcyqnrb .gt_super {
   font-size: 65%;
 }
 
-#bpasrnngxp .gt_footnote_marks {
+#klqrcyqnrb .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#bpasrnngxp .gt_asterisk {
+#klqrcyqnrb .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#bpasrnngxp .gt_indent_1 {
+#klqrcyqnrb .gt_indent_1 {
   text-indent: 5px;
 }
 
-#bpasrnngxp .gt_indent_2 {
+#klqrcyqnrb .gt_indent_2 {
   text-indent: 10px;
 }
 
-#bpasrnngxp .gt_indent_3 {
+#klqrcyqnrb .gt_indent_3 {
   text-indent: 15px;
 }
 
-#bpasrnngxp .gt_indent_4 {
+#klqrcyqnrb .gt_indent_4 {
   text-indent: 20px;
 }
 
-#bpasrnngxp .gt_indent_5 {
+#klqrcyqnrb .gt_indent_5 {
   text-indent: 25px;
 }
 
-#bpasrnngxp .katex-display {
+#klqrcyqnrb .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#bpasrnngxp div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#klqrcyqnrb div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
@@ -718,12 +722,12 @@ lawn_care |&gt; gt()
     </tr>
   </thead>
   <tbody class="gt_table_body">
-    <tr><td headers="group" class="gt_row gt_left">Not working</td>
-<td headers="avg_minutes" class="gt_row gt_right">91.02481</td>
-<td headers="avg_hours" class="gt_row gt_right">1.517080</td></tr>
-    <tr><td headers="group" class="gt_row gt_left">Working</td>
+    <tr><td headers="group" class="gt_row gt_left">Full-time</td>
 <td headers="avg_minutes" class="gt_row gt_right">103.84392</td>
 <td headers="avg_hours" class="gt_row gt_right">1.730732</td></tr>
+    <tr><td headers="group" class="gt_row gt_left">Retired</td>
+<td headers="avg_minutes" class="gt_row gt_right">91.02481</td>
+<td headers="avg_hours" class="gt_row gt_right">1.517080</td></tr>
   </tbody>
 </table>
 </div><!--/html_preserve-->

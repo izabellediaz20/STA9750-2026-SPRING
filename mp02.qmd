@@ -146,6 +146,8 @@ On average, Americans sleep about `r round(sleep_hours, 2)` hours per day.
 
 ## Task 5: Exploratory Questions - Table Answers
 
+## Task 5: Exploratory Questions - Table Answers
+
 ```{r}
 library(gt)
 
@@ -153,17 +155,20 @@ lawn_care <- atus_act |>
   inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |>
   inner_join(atus_resp, join_by(participant_id)) |>
   filter(str_detect(tolower(task_level3), "lawn")) |>
-  mutate(group = case_when(
-    employment_status == "Not in labor force" ~ "Not working",
-    employment_status == "Employed - at work" ~ "Working",
-    TRUE ~ "Other"
-  )) |>
-  filter(group %in% c("Not working", "Working")) |>
+  mutate(
+    group = case_when(
+      employment_status == "Not in labor force" ~ "Retired",
+      employment_status == "Employed - at work" ~ "Full-time",
+      TRUE ~ "Other"
+    )
+  ) |>
+  filter(group %in% c("Retired", "Full-time")) |>
   group_by(group) |>
-  summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE)) |>
+  summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE), .groups = "drop") |>
   mutate(avg_hours = avg_minutes / 60)
 
-lawn_care |> gt()
+lawn_care |>
+  gt()
 ```
 
 ---
