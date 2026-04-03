@@ -171,24 +171,23 @@ lawn_care |> gt()
 ## Task 6: Exploratory Questions - Graph Answers
 
 ```{r}
-household_plot <- atus_act |>
-  inner_join(atus_activity_labels, join_by(level3_code == code_level3)) |>
-  inner_join(atus_resp, join_by(participant_id)) |>
-  filter(str_detect(tolower(task_level1), "household")) |>
-  group_by(TEAGE) |>
-  summarise(avg_minutes = mean(time_spent_min, na.rm = TRUE), .groups = "drop")
+simple_plot <- atus_act |>
+  inner_join(atus_activity_labels, by = c("level3_code" = "code_level3")) |>
+  count(task_level1, sort = TRUE) |>
+  slice_head(n = 10)
 
-ggplot(household_plot, aes(x = TEAGE, y = avg_minutes)) +
-  geom_line() +
+ggplot(simple_plot, aes(x = reorder(task_level1, n), y = n)) +
+  geom_col() +
+  coord_flip() +
   theme_minimal() +
   labs(
-    title = "Time Spent on Household Activities by Age",
-    x = "Age",
-    y = "Average Minutes"
+    title = "Most Common Activity Categories",
+    x = "Activity Type",
+    y = "Count"
   )
 ```
 
-As age increases, the amount of time spent on household activities generally increases. Younger individuals tend to spend less time on these tasks, while older adults dedicate more time to household responsibilities, likely due to lifestyle changes and increased domestic responsibilities.
+As shown in the plot, the most common activities reported by Americans are concentrated in a few broad categories, especially personal care, socializing and leisure, and household activities. This suggests that a large share of daily time use is devoted to routine and essential parts of everyday life rather than less frequent or specialized tasks.
 
 ---
 
