@@ -234,10 +234,6 @@ Typical time use levels:
 - Sleep: Low = 5 hours, Medium = 7 hours, High = 8+ hours  
 
 ---
-<!--
-::: {.callout-note title="AI Usage Statement" collapse="true"}
-
-I used ChatGPT to help debug R errors, understand Quarto formatting, and structure my code for data loading, joining, and summarizing. I reviewed all outputs and made sure I understood the logic behind each step before including it in my submission.
 
 ::: {.callout-note title="AI Usage Statement" collapse="true"}
 
