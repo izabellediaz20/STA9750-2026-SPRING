@@ -492,28 +492,41 @@ state_mig_summary |> arrange(desc(net_migration)) |> slice_head(n = 10) |> gt()
 
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-metro_in <- metro_migration_clean |>
-  group_by(metro_current) |>
-  summarise(in_migration = sum(moved_in), .groups = "drop")
-
-metro_out <- metro_migration_clean |>
-  group_by(metro_1y) |>
-  summarise(out_migration = sum(moved_out), .groups = "drop") |>
-  rename(metro_current = metro_1y)
-
-metro_summary <- metro_in |>
-  full_join(metro_out, by = "metro_current") |>
-  mutate(
-    in_migration = replace_na(in_migration, 0),
-    out_migration = replace_na(out_migration, 0),
-    net_migration = in_migration - out_migration
+metro_migration_clean <- metro_to_metro_migration() |>
+  filter(
+    str_detect(metro_current, "Metro Area"),
+    str_detect(metro_1y, "Metro Area"),
+    !str_detect(metro_current, "Outside"),
+    !str_detect(metro_1y, "Outside")
   )
 
-metro_summary |> arrange(desc(in_migration)) |> slice_head(n = 10) |> gt()
-metro_summary |> arrange(desc(out_migration)) |> slice_head(n = 10) |> gt()
-metro_summary |> arrange(desc(net_migration)) |> slice_head(n = 10) |> gt()
+metro_summary <- metro_migration_clean |>
+  group_by(metro_current) |>
+  summarise(
+    in_migration = sum(moved_in, na.rm = TRUE),
+    out_migration = sum(moved_out, na.rm = TRUE),
+    net_migration = in_migration - out_migration,
+    .groups = "drop"
+  )
+
+metro_summary |>
+  arrange(desc(in_migration)) |>
+  slice_head(n = 10) |>
+  gt()
+
+metro_summary |>
+  arrange(desc(out_migration)) |>
+  slice_head(n = 10) |>
+  gt()
+
+metro_summary |>
+  arrange(desc(net_migration)) |>
+  slice_head(n = 10) |>
+  gt()
 ```
 :::
+
+The tables above show the metro areas with the highest levels of in-migration, out-migration, and net migration. Positive net migration indicates that more people are moving into a metro area than leaving, while negative net migration indicates that more people are leaving than moving in.
 
 ---
 
@@ -590,17 +603,55 @@ To produce a simple 2030 projection, I applied a modest overall growth factor to
 
 ## Task 8: Reapportionment
 
+To estimate congressional districts from the projected 2030 state populations, I applied the Huntington-Hill method. This method allocates seats by calculating priority values for each state based on population and then assigning seats until all 435 congressional districts are distributed.
+
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-ny_districts_2030 <- round(
-  pop_projection_2030$population[
-    pop_projection_2030$state == "New York"
-  ] / 750000
-)
+library(tidyverse)
+library(gt)
+
+MAX_DISTRICTS <- 100
+N_DISTRICTS <- 435
+
+apportionment_2030 <- pop_projection_2030 |>
+  transmute(
+    state,
+    population = as.integer(round(population))
+  ) |>
+  tidyr::expand_grid(cd = seq(0, MAX_DISTRICTS)) |>
+  mutate(
+    hh_den = sqrt(cd * (cd + 1)),
+    hh_weight = population / hh_den
+  ) |>
+  slice_max(hh_weight, n = N_DISTRICTS) |>
+  group_by(state) |>
+  summarise(
+    population = first(population),
+    n_districts = n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    pop_per_district = population / n_districts
+  ) |>
+  arrange(desc(n_districts), desc(population), state)
+
+ny_districts_2030 <- apportionment_2030 |>
+  filter(state == "New York") |>
+  pull(n_districts)
+
+apportionment_2030 |>
+  gt() |>
+  fmt_integer(columns = c(population, pop_per_district))
 ```
 :::
 
-Based on the projected 2030 population, New York is estimated to have **`r ny_districts_2030`** congressional districts.
+Based on the projected 2030 population and the Huntington-Hill apportionment method, New York is estimated to receive **`r ny_districts_2030`** congressional districts.
+
+::: {.callout-note collapse="true" title="Show Code"}
+```{r}
+ny_districts_2030
+```
+:::
 
 ## Task 9: Developing an Advertising Strategy to Induce Internal Migration and Increase State Political Power
 
