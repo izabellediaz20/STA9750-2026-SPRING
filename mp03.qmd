@@ -357,53 +357,72 @@ dim(metro_migration)
 
 ## Task 6: Exploratory Data Analysis
 
+```{r}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+
+state_lookup_tbl <- tibble(
+  state = state.name,
+  state_abb = state.abb
+)
+```
+
+---
+
 ### Question 1: Which states have had the highest net population growth rates over the past decade?
 
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-state_growth <- state_population_tidy %>%
-  filter(year %in% c(2015, 2024)) %>%
-  select(state, year, total_population) %>%
-  pivot_wider(names_from = year, values_from = total_population, names_prefix = "pop_") %>%
+library(tidyverse)
+library(scales)
+library(gt)
+
+state_growth <- state_population_tidy |>
+  filter(year %in% c(2015, 2024)) |>
+  select(state, year, total_population) |>
+  pivot_wider(names_from = year, values_from = total_population, names_prefix = "pop_") |>
   mutate(
     growth = pop_2024 - pop_2015,
     growth_rate = growth / pop_2015
-  ) %>%
+  ) |>
   arrange(desc(growth_rate))
 
-top_growth_state <- state_growth %>% slice(1) %>% pull(state)
-top_growth_rate <- state_growth %>% slice(1) %>% pull(growth_rate)
+top_growth_state <- state_growth |> slice(1) |> pull(state)
+top_growth_rate <- state_growth |> slice(1) |> pull(growth_rate)
 
-state_growth %>%
-  slice_head(n = 10) %>%
-  mutate(growth_rate = percent(growth_rate, accuracy = 0.1)) %>%
+state_growth |>
+  slice_head(n = 10) |>
+  mutate(growth_rate = percent(growth_rate, accuracy = 0.1)) |>
   gt()
 ```
 :::
 
-The state with the highest population growth rate from 2015 to 2024 was **`r top_growth_state`**, with a growth rate of **`r percent(top_growth_rate, accuracy = 0.1)`**.
+The state with the highest population growth rate from 2015 to 2024 was **`r top_growth_state`**, with a growth rate of **`r scales::percent(top_growth_rate, accuracy = 0.1)`**.
+
+---
 
 ### Question 2: Migration Into and Out of New York State
 
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-ny_inflows <- state_flows %>%
-  filter(year_current == 2024, state_current == "NY", state_1y != "NY") %>%
+ny_inflows <- state_flows |>
+  filter(year_current == 2024, state_current == "NY", state_1y != "NY") |>
   arrange(desc(population))
 
-ny_outflows <- state_flows %>%
-  filter(year_current == 2024, state_1y == "NY", state_current != "NY") %>%
+ny_outflows <- state_flows |>
+  filter(year_current == 2024, state_1y == "NY", state_current != "NY") |>
   arrange(desc(population))
 
-ny_top_origin <- ny_inflows %>% slice(1) %>% pull(state_1y)
-ny_top_dest <- ny_outflows %>% slice(1) %>% pull(state_current)
+ny_top_origin <- ny_inflows |> slice(1) |> pull(state_1y)
+ny_top_dest <- ny_outflows |> slice(1) |> pull(state_current)
 
-ny_inflows %>% slice_head(n = 10) %>% gt()
-ny_outflows %>% slice_head(n = 10) %>% gt()
+ny_inflows |> slice_head(n = 10) |> gt()
+ny_outflows |> slice_head(n = 10) |> gt()
 ```
 :::
 
 The most common origin state for individuals moving into New York is **`r ny_top_origin`**, while the most common destination for those leaving New York is **`r ny_top_dest`**.
+
+---
 
 ### Question 3: Migration Into and Out of New York City Metro
 
@@ -411,170 +430,144 @@ The most common origin state for individuals moving into New York is **`r ny_top
 ```{r}
 nyc_metro <- "New York-Newark-Jersey City, NY-NJ-PA Metro Area"
 
-nyc_in <- metro_migration %>%
-  filter(metro_current == nyc_metro, metro_1y != nyc_metro) %>%
+metro_migration_clean <- metro_migration |>
+  filter(
+    str_detect(metro_current, "Metro Area"),
+    str_detect(metro_1y, "Metro Area")
+  )
+
+nyc_in <- metro_migration_clean |>
+  filter(metro_current == nyc_metro, metro_1y != nyc_metro) |>
   arrange(desc(moved_in))
 
-nyc_out <- metro_migration %>%
-  filter(metro_1y == nyc_metro, metro_current != nyc_metro) %>%
+nyc_out <- metro_migration_clean |>
+  filter(metro_1y == nyc_metro, metro_current != nyc_metro) |>
   arrange(desc(moved_out))
 
-nyc_top_origin_metro <- nyc_in %>% slice(1) %>% pull(metro_1y)
-nyc_top_dest_metro <- nyc_out %>% slice(1) %>% pull(metro_current)
+nyc_top_origin_metro <- nyc_in |> slice(1) |> pull(metro_1y)
+nyc_top_dest_metro <- nyc_out |> slice(1) |> pull(metro_current)
 
-nyc_in %>% select(metro_1y, moved_in) %>% slice_head(n = 10) %>% gt()
-nyc_out %>% select(metro_current, moved_out) %>% slice_head(n = 10) %>% gt()
+nyc_in |> select(metro_1y, moved_in) |> slice_head(n = 10) |> gt()
+nyc_out |> select(metro_current, moved_out) |> slice_head(n = 10) |> gt()
 ```
 :::
 
-The most common metro area people move from into the New York City metro area is **`r nyc_top_origin_metro`**, while the most common destination metro for those leaving the New York City metro area is **`r nyc_top_dest_metro`**.
+The most common metro area people move from into NYC is **`r nyc_top_origin_metro`**, while the most common destination metro for those leaving NYC is **`r nyc_top_dest_metro`**.
+
+---
 
 ### Question 4: States with Highest Migration Levels
 
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-state_in_mig <- state_flows %>%
-  filter(year_current == 2024, state_current != state_1y) %>%
-  group_by(state_current) %>%
-  summarise(in_migration = sum(population), .groups = "drop") %>%
+state_in_mig <- state_flows |>
+  filter(year_current == 2024, state_current != state_1y) |>
+  group_by(state_current) |>
+  summarise(in_migration = sum(population), .groups = "drop") |>
   rename(state = state_current)
 
-state_out_mig <- state_flows %>%
-  filter(year_current == 2024, state_current != state_1y) %>%
-  group_by(state_1y) %>%
-  summarise(out_migration = sum(population), .groups = "drop") %>%
+state_out_mig <- state_flows |>
+  filter(year_current == 2024, state_current != state_1y) |>
+  group_by(state_1y) |>
+  summarise(out_migration = sum(population), .groups = "drop") |>
   rename(state = state_1y)
 
-state_mig_summary <- state_in_mig %>%
-  full_join(state_out_mig, by = "state") %>%
+state_mig_summary <- state_in_mig |>
+  full_join(state_out_mig, by = "state") |>
   mutate(
     in_migration = replace_na(in_migration, 0),
     out_migration = replace_na(out_migration, 0),
     net_migration = in_migration - out_migration
   )
 
-state_mig_summary %>% arrange(desc(in_migration)) %>% slice_head(n = 10) %>% gt()
-state_mig_summary %>% arrange(desc(out_migration)) %>% slice_head(n = 10) %>% gt()
-state_mig_summary %>% arrange(desc(net_migration)) %>% slice_head(n = 10) %>% gt()
+state_mig_summary |> arrange(desc(in_migration)) |> slice_head(n = 10) |> gt()
+state_mig_summary |> arrange(desc(out_migration)) |> slice_head(n = 10) |> gt()
+state_mig_summary |> arrange(desc(net_migration)) |> slice_head(n = 10) |> gt()
 ```
 :::
 
-The summary tables above show the states with the largest total in-migration, total out-migration, and net migration in 2024.
+---
 
 ### Question 5: Metro Areas with Highest Migration Levels
 
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-metro_in_summary <- metro_migration %>%
-  group_by(metro_current) %>%
+metro_in <- metro_migration_clean |>
+  group_by(metro_current) |>
   summarise(in_migration = sum(moved_in), .groups = "drop")
 
-metro_out_summary <- metro_migration %>%
-  group_by(metro_1y) %>%
-  summarise(out_migration = sum(moved_out), .groups = "drop") %>%
+metro_out <- metro_migration_clean |>
+  group_by(metro_1y) |>
+  summarise(out_migration = sum(moved_out), .groups = "drop") |>
   rename(metro_current = metro_1y)
 
-metro_summary <- metro_in_summary %>%
-  full_join(metro_out_summary, by = "metro_current") %>%
+metro_summary <- metro_in |>
+  full_join(metro_out, by = "metro_current") |>
   mutate(
     in_migration = replace_na(in_migration, 0),
     out_migration = replace_na(out_migration, 0),
     net_migration = in_migration - out_migration
   )
 
-metro_summary %>% arrange(desc(in_migration)) %>% slice_head(n = 10) %>% gt()
-metro_summary %>% arrange(desc(out_migration)) %>% slice_head(n = 10) %>% gt()
-metro_summary %>% arrange(desc(net_migration)) %>% slice_head(n = 10) %>% gt()
+metro_summary |> arrange(desc(in_migration)) |> slice_head(n = 10) |> gt()
+metro_summary |> arrange(desc(out_migration)) |> slice_head(n = 10) |> gt()
+metro_summary |> arrange(desc(net_migration)) |> slice_head(n = 10) |> gt()
 ```
 :::
 
-The summary tables above show the metro areas with the largest in-migration, out-migration, and net migration totals.
+---
 
 ### Question 6: States with Highest Stability
 
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-state_pop_latest <- state_population_tidy %>%
+state_pop_latest <- state_population_tidy |>
   filter(year == 2024)
 
-stayed_put <- state_flows %>%
-  filter(year_current == 2024, state_current == state_1y) %>%
-  group_by(state_current) %>%
-  summarise(stayed_population = sum(population), .groups = "drop") %>%
-  rename(state = state_current) %>%
-  left_join(state_pop_latest, by = "state") %>%
-  mutate(prop_stayed = stayed_population / total_population) %>%
+stayed_put <- state_flows |>
+  filter(year_current == 2024, state_current == state_1y) |>
+  group_by(state_current) |>
+  summarise(stayed_population = sum(population), .groups = "drop") |>
+  rename(state_abb = state_current) |>
+  left_join(state_lookup_tbl, by = "state_abb") |>
+  left_join(state_pop_latest, by = "state") |>
+  mutate(prop_stayed = stayed_population / total_population) |>
   arrange(desc(prop_stayed))
 
-stayed_put %>% slice_head(n = 10) %>% gt()
+stayed_put |> slice_head(n = 10) |> gt()
 ```
 :::
 
-The table above shows the states with the highest share of residents who remained in the same state.
+---
 
 ### Question 7: Growth Driven by Migration
 
 ::: {.callout-note collapse="true" title="Show Code"}
 ```{r}
-pop_growth <- state_population_tidy %>%
-  filter(year %in% c(2023, 2024)) %>%
-  pivot_wider(names_from = year, values_from = total_population) %>%
+pop_growth <- state_population_tidy |>
+  filter(year %in% c(2023, 2024)) |>
+  pivot_wider(names_from = year, values_from = total_population) |>
   mutate(total_growth = `2024` - `2023`)
 
-growth_vs_migration <- pop_growth %>%
-  left_join(state_mig_summary, by = "state") %>%
-  mutate(
-    frac = if_else(total_growth > 0, net_migration / total_growth, NA_real_)
-  ) %>%
-  filter(total_growth > 0) %>%
+state_mig_summary_named <- state_mig_summary |>
+  rename(state_abb = state) |>
+  left_join(state_lookup_tbl, by = "state_abb") |>
+  select(state, in_migration, out_migration, net_migration)
+
+growth_vs_migration <- pop_growth |>
+  left_join(state_mig_summary_named, by = "state") |>
+  mutate(frac = net_migration / total_growth) |>
+  filter(total_growth > 0) |>
   arrange(desc(frac))
 
-top_migration_growth_state <- growth_vs_migration %>% slice(1) %>% pull(state)
+top_migration_growth_state <- growth_vs_migration |> slice(1) |> pull(state)
 
-growth_vs_migration %>% slice_head(n = 10) %>% gt()
+growth_vs_migration |> slice_head(n = 10) |> gt()
 ```
 :::
 
 The state with the highest proportion of growth driven by migration is **`r top_migration_growth_state`**.
 
-### Question 8–11: State + Metro Deep Dive (New York)
-
-Largest metro: **New York-Newark-Jersey City, NY-NJ-PA Metro Area**
-
-::: {.callout-note collapse="true" title="Show Code"}
-```{r}
-focus_state <- "NY"
-focus_metro <- "New York-Newark-Jersey City, NY-NJ-PA Metro Area"
-
-focus_inflows <- state_flows %>%
-  filter(year_current == 2024, state_current == focus_state, state_1y != focus_state)
-
-focus_outflows <- state_flows %>%
-  filter(year_current == 2024, state_1y == focus_state, state_current != focus_state)
-
-focus_top_origin_state <- focus_inflows %>% arrange(desc(population)) %>% slice(1) %>% pull(state_1y)
-focus_top_dest_state <- focus_outflows %>% arrange(desc(population)) %>% slice(1) %>% pull(state_current)
-
-metro_focus_in <- metro_migration %>%
-  filter(metro_current == focus_metro, metro_1y != focus_metro)
-
-metro_focus_out <- metro_migration %>%
-  filter(metro_1y == focus_metro, metro_current != focus_metro)
-
-focus_top_origin_metro <- metro_focus_in %>% arrange(desc(moved_in)) %>% slice(1) %>% pull(metro_1y)
-focus_top_dest_metro <- metro_focus_out %>% arrange(desc(moved_out)) %>% slice(1) %>% pull(metro_current)
-
-metro_connections <- metro_migration %>%
-  filter(metro_1y == focus_metro, metro_current != focus_metro) %>%
-  group_by(metro_current) %>%
-  summarise(connection = sum(moved_out), .groups = "drop") %>%
-  arrange(desc(connection))
-
-metro_connections %>% slice_head(n = 10) %>% gt()
-```
-:::
-
-For New York, the most common origin state among movers into the state is **`r focus_top_origin_state`**, and the most common destination state among movers leaving New York is **`r focus_top_dest_state`**. At the metro level, the top origin metro feeding into the New York City metro area is **`r focus_top_origin_metro`**, while the top destination metro for movers leaving the region is **`r focus_top_dest_metro`**.
 
 ## Task 7: Population Projections
 
