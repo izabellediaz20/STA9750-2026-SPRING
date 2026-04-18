@@ -1,9 +1,7 @@
 ---
 title: "STA 9750 Mini Project 03"
 author: "Izabelle Diaz"
-format:
-  html:
-    embed-resources: true
+format: html
 ---
 
 ## Task 1: Data Acquisition - State Population
