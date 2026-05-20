@@ -646,47 +646,15 @@ concern about the establishment’s cleanliness.</p>
 to_install &lt;- pkgs[!pkgs %in% rownames(installed.packages())]
 if (length(to_install) &gt; 0) install.packages(to_install)
 
-library(tidyverse)</code></pre>
-<pre><code>## ── Attaching core tidyverse packages ────────────────────────────────────────── tidyverse 2.0.0 ──
-## ✔ dplyr     1.2.0     ✔ readr     2.1.6
-## ✔ forcats   1.0.1     ✔ stringr   1.6.0
-## ✔ ggplot2   4.0.2     ✔ tibble    3.3.1
-## ✔ lubridate 1.9.5     ✔ tidyr     1.3.2
-## ✔ purrr     1.2.1     
-## ── Conflicts ──────────────────────────────────────────────────────────── tidyverse_conflicts() ──
-## ✖ dplyr::filter() masks stats::filter()
-## ✖ dplyr::lag()    masks stats::lag()
-## ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
-<pre class="r"><code>library(lubridate)
-library(scales)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;scales&#39;
-## 
-## The following object is masked from &#39;package:purrr&#39;:
-## 
-##     discard
-## 
-## The following object is masked from &#39;package:readr&#39;:
-## 
-##     col_factor</code></pre>
-<pre class="r"><code>library(knitr)
-library(kableExtra)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;kableExtra&#39;
-## 
-## The following object is masked from &#39;package:dplyr&#39;:
-## 
-##     group_rows</code></pre>
-<pre class="r"><code>library(broom)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(knitr)
+library(kableExtra)
+library(broom)
 library(glue)
 library(httr2)
 library(jsonlite)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;jsonlite&#39;
-## 
-## The following object is masked from &#39;package:purrr&#39;:
-## 
-##     flatten</code></pre>
 <pre class="r"><code>theme_nyc &lt;- function() {
   theme_minimal(base_size = 13) +
     theme(plot.title = element_text(face = &quot;bold&quot;, size = 15),
@@ -783,8 +751,8 @@ complaints &lt;- raw_311 |&gt;
 
 rm(raw_inspections, raw_311); gc()</code></pre>
 <pre><code>##            used  (Mb) gc trigger  (Mb) max used  (Mb)
-## Ncells  2459698 131.4    4387138 234.3  3818944 204.0
-## Vcells 11198606  85.5   23520636 179.5 23479297 179.2</code></pre>
+## Ncells  3864073 206.4    7136785 381.2  7136785 381.2
+## Vcells 13648764 104.2   28304763 216.0 28283064 215.8</code></pre>
 <hr />
 </div>
 <div id="data-quality-assessment" class="section level2">
@@ -1181,35 +1149,44 @@ system already disaggregates complaints by type.</p>
 ##   LAPACK version 3.12.1
 ## 
 ## locale:
-## [1] LC_COLLATE=English_United States.utf8  LC_CTYPE=English_United States.utf8   
-## [3] LC_MONETARY=English_United States.utf8 LC_NUMERIC=C                          
+## [1] LC_COLLATE=English_United States.utf8 
+## [2] LC_CTYPE=English_United States.utf8   
+## [3] LC_MONETARY=English_United States.utf8
+## [4] LC_NUMERIC=C                          
 ## [5] LC_TIME=English_United States.utf8    
 ## 
 ## time zone: America/New_York
 ## tzcode source: internal
 ## 
 ## attached base packages:
-## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## [1] stats     graphics  grDevices utils     datasets  methods  
+## [7] base     
 ## 
 ## other attached packages:
-##  [1] jsonlite_2.0.0   httr2_1.2.2      glue_1.8.0       broom_1.0.12     kableExtra_1.4.0
-##  [6] knitr_1.51       scales_1.4.0     lubridate_1.9.5  forcats_1.0.1    stringr_1.6.0   
-## [11] dplyr_1.2.0      purrr_1.2.1      readr_2.1.6      tidyr_1.3.2      tibble_3.3.1    
+##  [1] jsonlite_2.0.0   httr2_1.2.2      glue_1.8.0      
+##  [4] broom_1.0.12     kableExtra_1.4.0 knitr_1.51      
+##  [7] scales_1.4.0     lubridate_1.9.5  forcats_1.0.1   
+## [10] stringr_1.6.0    dplyr_1.2.0      purrr_1.2.1     
+## [13] readr_2.1.6      tidyr_1.3.2      tibble_3.3.1    
 ## [16] ggplot2_4.0.2    tidyverse_2.0.0 
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] rappdirs_0.3.4     sass_0.4.10        generics_0.1.4     xml2_1.5.2        
-##  [5] lattice_0.22-9     stringi_1.8.7      hms_1.1.4          digest_0.6.39     
-##  [9] magrittr_2.0.4     evaluate_1.0.5     grid_4.5.3         timechange_0.4.0  
-## [13] RColorBrewer_1.1-3 fastmap_1.2.0      Matrix_1.7-4       backports_1.5.0   
-## [17] mgcv_1.9-4         viridisLite_0.4.3  codetools_0.2-20   textshaping_1.0.4 
-## [21] jquerylib_0.1.4    cli_3.6.5          rlang_1.1.7        splines_4.5.3     
-## [25] withr_3.0.2        cachem_1.1.0       yaml_2.3.12        otel_0.2.0        
-## [29] tools_4.5.3        tzdb_0.5.0         curl_7.0.0         vctrs_0.7.1       
-## [33] R6_2.6.1           lifecycle_1.0.5    pkgconfig_2.0.3    pillar_1.11.1     
-## [37] bslib_0.10.0       gtable_0.3.6       rsconnect_1.8.0    systemfonts_1.3.1 
-## [41] xfun_0.56          tidyselect_1.2.1   rstudioapi_0.18.0  farver_2.1.2      
-## [45] nlme_3.1-168       htmltools_0.5.9    labeling_0.4.3     rmarkdown_2.31    
+##  [1] rappdirs_0.3.4     sass_0.4.10        generics_0.1.4    
+##  [4] xml2_1.5.2         lattice_0.22-9     stringi_1.8.7     
+##  [7] hms_1.1.4          digest_0.6.39      magrittr_2.0.4    
+## [10] evaluate_1.0.5     grid_4.5.3         timechange_0.4.0  
+## [13] RColorBrewer_1.1-3 fastmap_1.2.0      Matrix_1.7-4      
+## [16] backports_1.5.0    mgcv_1.9-4         viridisLite_0.4.3 
+## [19] codetools_0.2-20   textshaping_1.0.4  jquerylib_0.1.4   
+## [22] cli_3.6.5          rlang_1.1.7        splines_4.5.3     
+## [25] withr_3.0.2        cachem_1.1.0       yaml_2.3.12       
+## [28] otel_0.2.0         tools_4.5.3        tzdb_0.5.0        
+## [31] curl_7.0.0         vctrs_0.7.1        R6_2.6.1          
+## [34] lifecycle_1.0.5    pkgconfig_2.0.3    pillar_1.11.1     
+## [37] bslib_0.10.0       gtable_0.3.6       rsconnect_1.8.0   
+## [40] systemfonts_1.3.1  xfun_0.56          tidyselect_1.2.1  
+## [43] rstudioapi_0.18.0  farver_2.1.2       nlme_3.1-168      
+## [46] htmltools_0.5.9    labeling_0.4.3     rmarkdown_2.31    
 ## [49] svglite_2.2.2      compiler_4.5.3     S7_0.2.1</code></pre>
 </div>
 
