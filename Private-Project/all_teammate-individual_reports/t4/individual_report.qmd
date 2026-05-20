@@ -1,7 +1,7 @@
 ---
 title: "Complaint Type Specificity and Critical Violation Rates"
 subtitle: "STA 9750 | Individual Report | Restaurant Complaints vs Inspection Risk in NYC"
-author: "Group Member 4"
+author: "Izabelle Diaz"
 date: "2026-05-12"
 format:
   html:
